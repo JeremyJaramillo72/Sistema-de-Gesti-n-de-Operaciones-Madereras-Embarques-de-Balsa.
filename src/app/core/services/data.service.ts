@@ -326,6 +326,30 @@ export class DataService {
     }
   }
 
+  /**
+   * Ejecuta una promesa o llamada de Supabase con tiempo límite de 7.5s.
+   * Evita bloqueos indefinidos cuando la señal celular o internet es deficiente.
+   */
+  public async ejecutarConTimeout(promesa: any, ms = 7500): Promise<any> {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<null>((resolve) => {
+      timeoutId = setTimeout(() => {
+        console.warn(`[DataService] Solicitud Supabase excedió ${ms}ms por baja señal. Resguardando localmente.`);
+        resolve(null);
+      }, ms);
+    });
+
+    try {
+      const res = await Promise.race([Promise.resolve(promesa), timeoutPromise]);
+      clearTimeout(timeoutId);
+      return res;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.warn('[DataService] Error o corte de red en Supabase:', err);
+      return null;
+    }
+  }
+
   // ==========================================
   // CARGA DESDE SUPABASE
   // ==========================================
@@ -553,7 +577,7 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        const { data, error } = await this.supabase
+        const insertPromise = this.supabase
           .from('trabajadores')
           .insert({
             nombre: nuevo.nombre,
@@ -564,7 +588,10 @@ export class DataService {
           .select()
           .single();
 
-        if (!error && data) nuevo.id = data.id;
+        const res = await this.ejecutarConTimeout(insertPromise, 7500);
+        if (res && !res.error && res.data) {
+          nuevo.id = res.data.id;
+        }
       } catch (e) {
         console.error('Error guardando trabajador en Supabase:', e);
       }
@@ -597,23 +624,30 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        const { data: dbRow } = await this.supabase
-          .from('trabajadores')
-          .select('telefono')
-          .eq('id', id)
-          .single();
+        const dbRes = await this.ejecutarConTimeout(
+          this.supabase
+            .from('trabajadores')
+            .select('telefono')
+            .eq('id', id)
+            .single(),
+          7500
+        );
 
+        const dbRow = dbRes?.data;
         const authMatch = (dbRow?.telefono || '').match(/<!--usr_auth:(.*?)-->/);
         const authTag = authMatch && !tagInfo.obsConTag.includes('<!--usr_auth:') ? ` ${authMatch[0]}` : '';
 
-        await this.supabase
-          .from('trabajadores')
-          .update({
-            nombre: trabajadorActualizado.nombre,
-            alias: trabajadorActualizado.alias,
-            telefono: tagInfo.obsConTag + authTag
-          })
-          .eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('trabajadores')
+            .update({
+              nombre: trabajadorActualizado.nombre,
+              alias: trabajadorActualizado.alias,
+              telefono: tagInfo.obsConTag + authTag
+            })
+            .eq('id', id),
+          7500
+        );
       } catch (e) {
         console.error('Error actualizando trabajador en Supabase:', e);
       }
@@ -627,10 +661,13 @@ export class DataService {
   public async eliminarTrabajador(id: string): Promise<void> {
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        await this.supabase
-          .from('trabajadores')
-          .delete()
-          .eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('trabajadores')
+            .delete()
+            .eq('id', id),
+          7500
+        );
       } catch (e) {
         console.error('Error eliminando trabajador en Supabase:', e);
       }
@@ -694,28 +731,31 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        const { data: dData, error: dErr } = await this.supabase
-          .from('descargas_madera')
-          .insert({
-            fecha: nuevaDescarga.fecha,
-            cantidad_carros: nuevaDescarga.cantidad_carros,
-            filas_por_carro: nuevaDescarga.filas_por_carro,
-            tarifa_por_fila: nuevaDescarga.tarifa_por_fila,
-            total_pago: nuevaDescarga.total_pago,
-            observaciones: tagInfo.obsConTag
-          })
-          .select()
-          .single();
+        const dRes = await this.ejecutarConTimeout(
+          this.supabase
+            .from('descargas_madera')
+            .insert({
+              fecha: nuevaDescarga.fecha,
+              cantidad_carros: nuevaDescarga.cantidad_carros,
+              filas_por_carro: nuevaDescarga.filas_por_carro,
+              tarifa_por_fila: nuevaDescarga.tarifa_por_fila,
+              total_pago: totalPago,
+              observaciones: tagInfo.obsConTag
+            })
+            .select()
+            .single(),
+          7500
+        );
 
-        if (!dErr && dData) {
-          nuevaDescarga.id = dData.id;
+        if (dRes && !dRes.error && dRes.data) {
+          nuevaDescarga.id = dRes.data.id;
           const itemsInsert = listaTrabajadores.map(item => ({
-            descarga_id: dData.id,
+            descarga_id: dRes.data.id,
             trabajador_id: item.trabajador_id,
             monto_individual: item.monto_individual,
             pagado: item.pagado
           }));
-          await this.supabase.from('descarga_trabajadores').insert(itemsInsert);
+          await this.ejecutarConTimeout(this.supabase.from('descarga_trabajadores').insert(itemsInsert), 7500);
         }
       } catch (e) {
         console.error('Error guardando en Supabase:', e);
@@ -782,19 +822,25 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        await this.supabase
-          .from('descargas_madera')
-          .update({
-            fecha: datos.fecha,
-            cantidad_carros: datos.cantidad_carros,
-            filas_por_carro: datos.filas_por_carro,
-            tarifa_por_fila: tarifa,
-            total_pago: totalPago,
-            observaciones: tagInfo.obsConTag
-          })
-          .eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('descargas_madera')
+            .update({
+              fecha: datos.fecha,
+              cantidad_carros: datos.cantidad_carros,
+              filas_por_carro: datos.filas_por_carro,
+              tarifa_por_fila: tarifa,
+              total_pago: totalPago,
+              observaciones: tagInfo.obsConTag
+            })
+            .eq('id', id),
+          7500
+        );
 
-        await this.supabase.from('descarga_trabajadores').delete().eq('descarga_id', id);
+        await this.ejecutarConTimeout(
+          this.supabase.from('descarga_trabajadores').delete().eq('descarga_id', id),
+          7500
+        );
         const itemsInsert = listaTrabajadores.map(item => ({
           descarga_id: id,
           trabajador_id: item.trabajador_id,
@@ -802,7 +848,10 @@ export class DataService {
           pagado: item.pagado,
           fecha_pago: item.fecha_pago
         }));
-        await this.supabase.from('descarga_trabajadores').insert(itemsInsert);
+        await this.ejecutarConTimeout(
+          this.supabase.from('descarga_trabajadores').insert(itemsInsert),
+          7500
+        );
       } catch (e) {
         console.error('Error actualizando descarga en Supabase:', e);
       }
@@ -817,8 +866,14 @@ export class DataService {
   public async eliminarDescarga(id: string): Promise<boolean> {
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        await this.supabase.from('descarga_trabajadores').delete().eq('descarga_id', id);
-        await this.supabase.from('descargas_madera').delete().eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase.from('descarga_trabajadores').delete().eq('descarga_id', id),
+          7500
+        );
+        await this.ejecutarConTimeout(
+          this.supabase.from('descargas_madera').delete().eq('id', id),
+          7500
+        );
       } catch (e) {
         console.error('Error eliminando descarga en Supabase:', e);
       }
@@ -881,27 +936,30 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        const { data: eData, error: eErr } = await this.supabase
-          .from('embarques_trailer')
-          .insert({
-            fecha: nuevoEmbarque.fecha,
-            cantidad_trailers: nuevoEmbarque.cantidad_trailers,
-            tarifa_por_persona_trailer: nuevoEmbarque.tarifa_por_persona_trailer,
-            total_pago: nuevoEmbarque.total_pago,
-            observaciones: tagInfo.obsConTag
-          })
-          .select()
-          .single();
+        const eRes = await this.ejecutarConTimeout(
+          this.supabase
+            .from('embarques_trailer')
+            .insert({
+              fecha: nuevoEmbarque.fecha,
+              cantidad_trailers: nuevoEmbarque.cantidad_trailers,
+              tarifa_por_persona_trailer: nuevoEmbarque.tarifa_por_persona_trailer,
+              total_pago: nuevoEmbarque.total_pago,
+              observaciones: tagInfo.obsConTag
+            })
+            .select()
+            .single(),
+          7500
+        );
 
-        if (!eErr && eData) {
-          nuevoEmbarque.id = eData.id;
+        if (eRes && !eRes.error && eRes.data) {
+          nuevoEmbarque.id = eRes.data.id;
           const itemsInsert = listaTrabajadores.map(item => ({
-            embarque_id: eData.id,
+            embarque_id: eRes.data.id,
             trabajador_id: item.trabajador_id,
             monto_individual: item.monto_individual,
             pagado: item.pagado
           }));
-          await this.supabase.from('embarque_trabajadores').insert(itemsInsert);
+          await this.ejecutarConTimeout(this.supabase.from('embarque_trabajadores').insert(itemsInsert), 7500);
         }
       } catch (e) {
         console.error('Error guardando en Supabase:', e);
@@ -966,18 +1024,24 @@ export class DataService {
 
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        await this.supabase
-          .from('embarques_trailer')
-          .update({
-            fecha: datos.fecha,
-            cantidad_trailers: datos.cantidad_trailers,
-            tarifa_por_persona_trailer: tarifa,
-            total_pago: totalPago,
-            observaciones: tagInfo.obsConTag
-          })
-          .eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('embarques_trailer')
+            .update({
+              fecha: datos.fecha,
+              cantidad_trailers: datos.cantidad_trailers,
+              tarifa_por_persona_trailer: tarifa,
+              total_pago: totalPago,
+              observaciones: tagInfo.obsConTag
+            })
+            .eq('id', id),
+          7500
+        );
 
-        await this.supabase.from('embarque_trabajadores').delete().eq('embarque_id', id);
+        await this.ejecutarConTimeout(
+          this.supabase.from('embarque_trabajadores').delete().eq('embarque_id', id),
+          7500
+        );
         const itemsInsert = listaTrabajadores.map(item => ({
           embarque_id: id,
           trabajador_id: item.trabajador_id,
@@ -985,7 +1049,10 @@ export class DataService {
           pagado: item.pagado,
           fecha_pago: item.fecha_pago
         }));
-        await this.supabase.from('embarque_trabajadores').insert(itemsInsert);
+        await this.ejecutarConTimeout(
+          this.supabase.from('embarque_trabajadores').insert(itemsInsert),
+          7500
+        );
       } catch (e) {
         console.error('Error actualizando embarque en Supabase:', e);
       }
@@ -1000,8 +1067,14 @@ export class DataService {
   public async eliminarEmbarque(id: string): Promise<boolean> {
     if (this.isUsingSupabase() && this.supabase) {
       try {
-        await this.supabase.from('embarque_trabajadores').delete().eq('embarque_id', id);
-        await this.supabase.from('embarques_trailer').delete().eq('id', id);
+        await this.ejecutarConTimeout(
+          this.supabase.from('embarque_trabajadores').delete().eq('embarque_id', id),
+          7500
+        );
+        await this.ejecutarConTimeout(
+          this.supabase.from('embarques_trailer').delete().eq('id', id),
+          7500
+        );
       } catch (e) {
         console.error('Error eliminando embarque en Supabase:', e);
       }
@@ -1044,10 +1117,13 @@ export class DataService {
       localStorage.setItem(STORAGE_KEYS.DESCARGAS, JSON.stringify(lista));
 
       if (this.isUsingSupabase() && this.supabase) {
-        await this.supabase
-          .from('descarga_trabajadores')
-          .update({ pagado: nuevoEstado, fecha_pago: fechaPago })
-          .match({ descarga_id: operacionId, trabajador_id: trabajadorId });
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('descarga_trabajadores')
+            .update({ pagado: nuevoEstado, fecha_pago: fechaPago })
+            .match({ descarga_id: operacionId, trabajador_id: trabajadorId }),
+          7500
+        );
       }
     } else {
       const lista = this.embarques().map(e => {
@@ -1068,10 +1144,13 @@ export class DataService {
       localStorage.setItem(STORAGE_KEYS.EMBARQUES, JSON.stringify(lista));
 
       if (this.isUsingSupabase() && this.supabase) {
-        await this.supabase
-          .from('embarque_trabajadores')
-          .update({ pagado: nuevoEstado, fecha_pago: fechaPago })
-          .match({ embarque_id: operacionId, trabajador_id: trabajadorId });
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('embarque_trabajadores')
+            .update({ pagado: nuevoEstado, fecha_pago: fechaPago })
+            .match({ embarque_id: operacionId, trabajador_id: trabajadorId }),
+          7500
+        );
       }
     }
   }
@@ -1094,10 +1173,13 @@ export class DataService {
       localStorage.setItem(STORAGE_KEYS.DESCARGAS, JSON.stringify(lista));
 
       if (this.isUsingSupabase() && this.supabase) {
-        await this.supabase
-          .from('descarga_trabajadores')
-          .update({ pagado: true, fecha_pago: fechaPago })
-          .eq('descarga_id', operacionId);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('descarga_trabajadores')
+            .update({ pagado: true, fecha_pago: fechaPago })
+            .eq('descarga_id', operacionId),
+          7500
+        );
       }
     } else {
       const lista = this.embarques().map(e => {
@@ -1113,10 +1195,13 @@ export class DataService {
       localStorage.setItem(STORAGE_KEYS.EMBARQUES, JSON.stringify(lista));
 
       if (this.isUsingSupabase() && this.supabase) {
-        await this.supabase
-          .from('embarque_trabajadores')
-          .update({ pagado: true, fecha_pago: fechaPago })
-          .eq('embarque_id', operacionId);
+        await this.ejecutarConTimeout(
+          this.supabase
+            .from('embarque_trabajadores')
+            .update({ pagado: true, fecha_pago: fechaPago })
+            .eq('embarque_id', operacionId),
+          7500
+        );
       }
     }
   }

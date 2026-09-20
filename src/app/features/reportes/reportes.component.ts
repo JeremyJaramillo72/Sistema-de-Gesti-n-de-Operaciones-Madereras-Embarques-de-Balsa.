@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 
 export interface FaenaAuditoria {
   numero: string;
@@ -40,8 +41,10 @@ export interface ResumenTrabajador {
 export class ReportesComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
+  feedbackService = inject(FeedbackService);
   route = inject(ActivatedRoute);
 
+  guardando = signal<boolean>(false);
   fechaHoy = new Date().toISOString().split('T')[0];
 
   // FILTROS REACTIVOS COMO SIGNALS
@@ -294,9 +297,18 @@ export class ReportesComponent {
   });
 
   async togglePago(t: FaenaAuditoria) {
+    if (this.guardando()) return;
+    this.guardando.set(true);
     const nuevoEstado = !t.pagado;
-    await this.dataService.cambiarEstadoPago(t.tipo, t.operacionId, t.trabajadorId, nuevoEstado);
-    this.mostrarNotificacion(nuevoEstado ? `Faena de ${t.trabajador} marcada como pagada` : `Pago de ${t.trabajador} desmarcado`);
+    this.feedbackService.iniciarCarga(nuevoEstado ? `Registrando pago de ${t.trabajador}...` : `Desmarcando pago de ${t.trabajador}...`);
+    try {
+      await this.dataService.cambiarEstadoPago(t.tipo, t.operacionId, t.trabajadorId, nuevoEstado);
+      this.feedbackService.finalizarExito(nuevoEstado ? `Faena de ${t.trabajador} marcada como pagada` : `Pago de ${t.trabajador} desmarcado`);
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al actualizar estado de pago');
+    } finally {
+      this.guardando.set(false);
+    }
   }
 
   // Generar Reporte PDF (Activa directamente la vista y diálogo de impresión a PDF)

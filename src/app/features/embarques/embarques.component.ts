@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 import { EmbarqueTrailer } from '../../core/models/boya.models';
 
 @Component({
@@ -15,8 +16,10 @@ import { EmbarqueTrailer } from '../../core/models/boya.models';
 export class EmbarquesComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
+  feedbackService = inject(FeedbackService);
   Math = Math;
 
+  guardando = signal<boolean>(false);
   mostrarFormulario = signal<boolean>(false);
   modoEdicion = signal<boolean>(false);
   idEnEdicion = signal<string | null>(null);
@@ -156,11 +159,21 @@ export class EmbarquesComponent {
   }
 
   async toggleMiPago(e: EmbarqueTrailer) {
+    if (this.guardando()) return;
     const miDetalle = this.getMiDetalle(e);
     if (!miDetalle) return;
+
+    this.guardando.set(true);
     const nuevoEstado = !miDetalle.pagado;
-    await this.dataService.cambiarEstadoPago('EMBARQUE', e.id, miDetalle.trabajador_id, nuevoEstado);
-    this.mostrarNotificacion(nuevoEstado ? '✓ Faena marcada como cobrada' : 'Estado de cobro desmarcado');
+    this.feedbackService.iniciarCarga(nuevoEstado ? 'Marcando tráiler como cobrado...' : 'Desmarcando estado de cobro...');
+    try {
+      await this.dataService.cambiarEstadoPago('EMBARQUE', e.id, miDetalle.trabajador_id, nuevoEstado);
+      this.feedbackService.finalizarExito(nuevoEstado ? '✓ Tráiler marcado como cobrado' : 'Estado de cobro desmarcado');
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al actualizar estado');
+    } finally {
+      this.guardando.set(false);
+    }
   }
 
   establecerPeriodo(tipo: 'hoy' | 'semana' | 'abril' | 'mes' | 'todo') {
@@ -256,29 +269,44 @@ export class EmbarquesComponent {
   }
 
   async guardarEmbarque() {
+    if (this.guardando()) return;
     if (this.seleccionadosIds().length === 0) return;
 
-    if (this.modoEdicion() && this.idEnEdicion()) {
-      await this.dataService.actualizarEmbarque(this.idEnEdicion()!, {
-        fecha: this.fecha,
-        cantidad_trailers: Number(this.cantidadTrailers),
-        tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
-        trabajadores_ids: this.seleccionadosIds(),
-        observaciones: this.observaciones
-      });
-      this.mostrarNotificacion('Embarque de tráiler actualizado con éxito');
-      this.cancelarEdicion();
-    } else {
-      await this.dataService.registrarEmbarque({
-        fecha: this.fecha,
-        cantidad_trailers: Number(this.cantidadTrailers),
-        tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
-        trabajadores_ids: this.seleccionadosIds(),
-        observaciones: this.observaciones
-      });
-      this.mostrarNotificacion('Nuevo embarque de tráiler guardado');
-      this.mostrarFormulario.set(false);
-      this.observaciones = '';
+    this.guardando.set(true);
+    const esEdicion = Boolean(this.modoEdicion() && this.idEnEdicion());
+    this.feedbackService.iniciarCarga(
+      esEdicion ? 'Actualizando embarque de tráiler...' : 'Guardando nuevo embarque de tráiler...',
+      'Sincronizando con la nube... por favor espera'
+    );
+
+    try {
+      if (esEdicion) {
+        await this.dataService.actualizarEmbarque(this.idEnEdicion()!, {
+          fecha: this.fecha,
+          cantidad_trailers: Number(this.cantidadTrailers),
+          tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
+          trabajadores_ids: this.seleccionadosIds(),
+          observaciones: this.observaciones
+        });
+        this.feedbackService.finalizarExito('¡Embarque de tráiler actualizado con éxito!');
+        this.cancelarEdicion();
+      } else {
+        await this.dataService.registrarEmbarque({
+          fecha: this.fecha,
+          cantidad_trailers: Number(this.cantidadTrailers),
+          tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
+          trabajadores_ids: this.seleccionadosIds(),
+          observaciones: this.observaciones
+        });
+        this.feedbackService.finalizarExito('¡Nuevo embarque de tráiler guardado!');
+        this.mostrarFormulario.set(false);
+        this.observaciones = '';
+      }
+    } catch (err) {
+      console.error('Error guardando embarque:', err);
+      this.feedbackService.finalizarError('Hubo un retraso de conexión. Tus datos se resguardaron localmente.');
+    } finally {
+      this.guardando.set(false);
     }
   }
 
@@ -294,12 +322,22 @@ export class EmbarquesComponent {
   }
 
   async ejecutarEliminar() {
+    if (this.guardando()) return;
     const e = this.itemAEliminar();
-    if (e) {
-      if (!this.puedeModificar(e)) return;
+    if (!e) return;
+    if (!this.puedeModificar(e)) return;
+
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga('Eliminando embarque de tráiler...', 'Actualizando registros...');
+    try {
       await this.dataService.eliminarEmbarque(e.id);
       this.cerrarModalEliminar();
-      this.mostrarNotificacion('Embarque de tráiler eliminado');
+      this.feedbackService.finalizarExito('Embarque de tráiler eliminado');
+    } catch (err) {
+      console.error(err);
+      this.feedbackService.finalizarError('Error al eliminar');
+    } finally {
+      this.guardando.set(false);
     }
   }
 

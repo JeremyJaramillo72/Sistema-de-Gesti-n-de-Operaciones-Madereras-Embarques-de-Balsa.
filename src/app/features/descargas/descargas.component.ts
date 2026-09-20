@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 import { DescargaMadera } from '../../core/models/boya.models';
 
 @Component({
@@ -15,8 +16,10 @@ import { DescargaMadera } from '../../core/models/boya.models';
 export class DescargasComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
+  feedbackService = inject(FeedbackService);
   Math = Math;
 
+  guardando = signal<boolean>(false);
   mostrarFormulario = signal<boolean>(false);
   modoEdicion = signal<boolean>(false);
   idEnEdicion = signal<string | null>(null);
@@ -144,11 +147,21 @@ export class DescargasComponent {
   }
 
   async toggleMiPago(d: DescargaMadera) {
+    if (this.guardando()) return;
     const miDetalle = this.getMiDetalle(d);
     if (!miDetalle) return;
+
+    this.guardando.set(true);
     const nuevoEstado = !miDetalle.pagado;
-    await this.dataService.cambiarEstadoPago('DESCARGA', d.id, miDetalle.trabajador_id, nuevoEstado);
-    this.mostrarNotificacion(nuevoEstado ? '✓ Faena marcada como cobrada' : 'Estado de cobro desmarcado');
+    this.feedbackService.iniciarCarga(nuevoEstado ? 'Marcando faena como cobrada...' : 'Desmarcando estado de cobro...');
+    try {
+      await this.dataService.cambiarEstadoPago('DESCARGA', d.id, miDetalle.trabajador_id, nuevoEstado);
+      this.feedbackService.finalizarExito(nuevoEstado ? '✓ Faena marcada como cobrada' : 'Estado de cobro desmarcado');
+    } catch (e) {
+      this.feedbackService.finalizarError('Error al actualizar estado');
+    } finally {
+      this.guardando.set(false);
+    }
   }
 
   establecerPeriodo(tipo: 'hoy' | 'semana' | 'abril' | 'mes' | 'todo') {
@@ -245,31 +258,46 @@ export class DescargasComponent {
   }
 
   async guardarDescarga() {
+    if (this.guardando()) return;
     if (this.seleccionadosIds().length === 0) return;
 
-    if (this.modoEdicion() && this.idEnEdicion()) {
-      await this.dataService.actualizarDescarga(this.idEnEdicion()!, {
-        fecha: this.fecha,
-        cantidad_carros: Number(this.cantidadCarros),
-        filas_por_carro: Number(this.filasPorCarro),
-        tarifa_por_fila: Number(this.tarifaPorFila),
-        trabajadores_ids: this.seleccionadosIds(),
-        observaciones: this.observaciones
-      });
-      this.mostrarNotificacion('Bajada de madera actualizada con éxito');
-      this.cancelarEdicion();
-    } else {
-      await this.dataService.registrarDescarga({
-        fecha: this.fecha,
-        cantidad_carros: Number(this.cantidadCarros),
-        filas_por_carro: Number(this.filasPorCarro),
-        tarifa_por_fila: Number(this.tarifaPorFila),
-        trabajadores_ids: this.seleccionadosIds(),
-        observaciones: this.observaciones
-      });
-      this.mostrarNotificacion('Nueva bajada guardada con éxito');
-      this.mostrarFormulario.set(false);
-      this.observaciones = '';
+    this.guardando.set(true);
+    const esEdicion = Boolean(this.modoEdicion() && this.idEnEdicion());
+    this.feedbackService.iniciarCarga(
+      esEdicion ? 'Actualizando bajada de madera...' : 'Guardando nueva bajada de madera...',
+      'Sincronizando con la nube... por favor espera'
+    );
+
+    try {
+      if (esEdicion) {
+        await this.dataService.actualizarDescarga(this.idEnEdicion()!, {
+          fecha: this.fecha,
+          cantidad_carros: Number(this.cantidadCarros),
+          filas_por_carro: Number(this.filasPorCarro),
+          tarifa_por_fila: Number(this.tarifaPorFila),
+          trabajadores_ids: this.seleccionadosIds(),
+          observaciones: this.observaciones
+        });
+        this.feedbackService.finalizarExito('¡Bajada de madera actualizada con éxito!');
+        this.cancelarEdicion();
+      } else {
+        await this.dataService.registrarDescarga({
+          fecha: this.fecha,
+          cantidad_carros: Number(this.cantidadCarros),
+          filas_por_carro: Number(this.filasPorCarro),
+          tarifa_por_fila: Number(this.tarifaPorFila),
+          trabajadores_ids: this.seleccionadosIds(),
+          observaciones: this.observaciones
+        });
+        this.feedbackService.finalizarExito('¡Nueva bajada guardada con éxito!');
+        this.mostrarFormulario.set(false);
+        this.observaciones = '';
+      }
+    } catch (err) {
+      console.error('Error guardando descarga:', err);
+      this.feedbackService.finalizarError('Hubo un retraso de conexión. Tus datos se resguardaron localmente.');
+    } finally {
+      this.guardando.set(false);
     }
   }
 
@@ -285,12 +313,22 @@ export class DescargasComponent {
   }
 
   async ejecutarEliminar() {
+    if (this.guardando()) return;
     const d = this.itemAEliminar();
-    if (d) {
-      if (!this.puedeModificar(d)) return;
+    if (!d) return;
+    if (!this.puedeModificar(d)) return;
+
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga('Eliminando bajada de madera...', 'Actualizando registros...');
+    try {
       await this.dataService.eliminarDescarga(d.id);
       this.cerrarModalEliminar();
-      this.mostrarNotificacion('Bajada de madera eliminada');
+      this.feedbackService.finalizarExito('Bajada de madera eliminada');
+    } catch (err) {
+      console.error(err);
+      this.feedbackService.finalizarError('Error al eliminar');
+    } finally {
+      this.guardando.set(false);
     }
   }
 

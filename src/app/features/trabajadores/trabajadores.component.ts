@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 
 export interface FaenaTrabajadorItem {
   id: string;
@@ -28,8 +29,10 @@ export interface FaenaTrabajadorItem {
 export class TrabajadoresComponent {
   dataService = inject(DataService);
   authService = inject(AuthService);
+  feedbackService = inject(FeedbackService);
   router = inject(Router);
 
+  guardando = signal<boolean>(false);
   mostrarFormulario = signal<boolean>(false);
   modoEdicion = signal<boolean>(false);
   idEnEdicion = signal<string | null>(null);
@@ -243,34 +246,58 @@ export class TrabajadoresComponent {
   }
 
   async confirmarEliminacion() {
+    if (this.guardando()) return;
     const t = this.trabajadorAEliminar();
     if (!t) return;
 
-    await this.dataService.eliminarTrabajador(t.id);
-    this.cerrarModalEliminar();
-    if (this.idEnEdicion() === t.id) {
-      this.cancelarEdicion();
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga('Eliminando de nómina...', 'Actualizando personal...');
+    try {
+      await this.dataService.eliminarTrabajador(t.id);
+      this.cerrarModalEliminar();
+      if (this.idEnEdicion() === t.id) {
+        this.cancelarEdicion();
+      }
+      this.feedbackService.finalizarExito(this.authService.esAdmin() ? 'Trabajador eliminado de nómina' : 'Ayudante eliminado de tu personal');
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al eliminar');
+    } finally {
+      this.guardando.set(false);
     }
-    this.mostrarNotificacion(this.authService.esAdmin() ? 'Trabajador eliminado de nómina' : 'Ayudante eliminado de tu personal');
   }
 
   async guardarTrabajador() {
+    if (this.guardando()) return;
     if (!this.nombre.trim()) return;
 
-    if (this.modoEdicion() && this.idEnEdicion()) {
-      await this.dataService.actualizarTrabajador(this.idEnEdicion()!, {
-        nombre: this.nombre,
-        alias: this.alias,
-        telefono: this.telefono
-      });
-      const esAdmin = this.authService.esAdmin();
-      this.mostrarNotificacion(esAdmin ? 'Trabajador actualizado en nómina' : 'Ayudante actualizado con éxito');
-      this.cancelarEdicion();
-    } else {
-      await this.dataService.agregarTrabajador(this.nombre, this.alias, this.telefono);
-      const esAdmin = this.authService.esAdmin();
-      this.mostrarNotificacion(esAdmin ? 'Nuevo trabajador registrado en nómina' : 'Nuevo ayudante agregado a tu personal');
-      this.cancelarEdicion();
+    this.guardando.set(true);
+    const esEdicion = Boolean(this.modoEdicion() && this.idEnEdicion());
+    const esAdmin = this.authService.esAdmin();
+
+    this.feedbackService.iniciarCarga(
+      esEdicion ? 'Actualizando datos...' : (esAdmin ? 'Registrando en nómina...' : 'Guardando ayudante...'),
+      'Sincronizando con la nube... por favor espera'
+    );
+
+    try {
+      if (esEdicion) {
+        await this.dataService.actualizarTrabajador(this.idEnEdicion()!, {
+          nombre: this.nombre,
+          alias: this.alias,
+          telefono: this.telefono
+        });
+        this.feedbackService.finalizarExito(esAdmin ? 'Trabajador actualizado en nómina' : 'Ayudante actualizado con éxito');
+        this.cancelarEdicion();
+      } else {
+        await this.dataService.agregarTrabajador(this.nombre, this.alias, this.telefono);
+        this.feedbackService.finalizarExito(esAdmin ? 'Nuevo trabajador registrado en nómina' : 'Nuevo ayudante agregado con éxito');
+        this.cancelarEdicion();
+      }
+    } catch (err) {
+      console.error(err);
+      this.feedbackService.finalizarError('Hubo un retraso de conexión. Datos resguardados localmente.');
+    } finally {
+      this.guardando.set(false);
     }
   }
 
@@ -283,9 +310,18 @@ export class TrabajadoresComponent {
   }
 
   async togglePagoEnModal(f: FaenaTrabajadorItem) {
+    if (this.guardando()) return;
+    this.guardando.set(true);
     const nuevo = !f.pagado;
-    await this.dataService.cambiarEstadoPago(f.tipo, f.operacionId, f.trabajadorId, nuevo);
-    this.mostrarNotificacion(nuevo ? 'Turno marcado como pagado' : 'Pago desmarcado');
+    this.feedbackService.iniciarCarga(nuevo ? 'Registrando pago...' : 'Desmarcando pago...');
+    try {
+      await this.dataService.cambiarEstadoPago(f.tipo, f.operacionId, f.trabajadorId, nuevo);
+      this.feedbackService.finalizarExito(nuevo ? 'Turno marcado como pagado' : 'Pago desmarcado');
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al actualizar pago');
+    } finally {
+      this.guardando.set(false);
+    }
   }
 
   irAReporteCompleto(nombre: string) {
@@ -302,12 +338,21 @@ export class TrabajadoresComponent {
   }
 
   async confirmarLimpiarCuentas() {
-    await this.dataService.reiniciarCuentasACero();
-    this.cerrarModalLimpiarCuentas();
-    if (this.trabajadorAuditoria()) {
-      this.cerrarAuditoria();
+    if (this.guardando()) return;
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga('Restableciendo cuentas...', 'Dejando saldos en $0.00 limpio...');
+    try {
+      await this.dataService.reiniciarCuentasACero();
+      this.cerrarModalLimpiarCuentas();
+      if (this.trabajadorAuditoria()) {
+        this.cerrarAuditoria();
+      }
+      this.feedbackService.finalizarExito('¡Cuentas dejadas en $0.00 limpio! Todo al día.');
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al reiniciar cuentas');
+    } finally {
+      this.guardando.set(false);
     }
-    this.mostrarNotificacion('¡Cuentas dejadas en $0.00 limpio! No hay saldos ni deudas pendientes.');
   }
 
   private mostrarNotificacion(msg: string) {
