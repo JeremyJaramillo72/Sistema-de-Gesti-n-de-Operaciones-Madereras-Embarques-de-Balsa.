@@ -168,17 +168,40 @@
   animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Contenedor centralizado para la Pestaña Flotante / Dynamic Island */
+.floating-pill-container {
+  position: fixed;
+  top: 1rem;
+  left: 0;
+  right: 0;
+  width: 100vw;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  pointer-events: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .floating-pill-container {
+    top: 1.5rem;
+  }
+}
+
 @keyframes slideDownFloating {
   0% {
     opacity: 0;
-    transform: translate(-50%, -24px) scale(0.92);
+    transform: translateY(-24px) scale(0.92);
   }
   70% {
-    transform: translate(-50%, 4px) scale(1.02);
+    transform: translateY(4px) scale(1.02);
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 

@@ -9,64 +9,66 @@
       <div class="fixed inset-0 z-[9990] bg-slate-900/10 backdrop-blur-[0.5px] cursor-wait select-none transition-all no-print"></div>
     }
 
-    <!-- Pestañita Flotante Centrada en la parte superior -->
-    <div class="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[9999] max-w-[94vw] sm:max-w-md w-auto animate-floating-pill no-print pointer-events-auto">
-      <div class="px-4 sm:px-5 py-2.5 sm:py-3 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.35)] border flex items-center gap-3 backdrop-blur-2xl transition-all duration-300"
-        [ngClass]="feedbackService.tipo() === 'loading'
-          ? 'bg-slate-950/95 text-white border-slate-700/80 shadow-slate-950/50'
-          : (feedbackService.tipo() === 'success'
-            ? 'bg-slate-950/95 text-white border-emerald-500/60 shadow-emerald-950/40'
-            : (feedbackService.tipo() === 'warning'
-              ? 'bg-slate-950/95 text-white border-amber-500/60 shadow-amber-950/40'
-              : 'bg-slate-950/95 text-white border-red-500/60 shadow-red-950/40'))">
-        
-        <!-- Icono Dinámico según Estado -->
-        <div class="shrink-0 flex items-center justify-center">
-          @if (feedbackService.tipo() === 'loading') {
-            <div class="relative flex items-center justify-center w-6 h-6">
-              <span class="absolute w-6 h-6 rounded-full bg-amber-400/20 animate-ping"></span>
-              <svg class="w-5 h-5 animate-spin text-amber-400" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-              </svg>
-            </div>
-          } @else if (feedbackService.tipo() === 'success') {
-            <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center text-xs font-black shadow-xs">
-              ✓
-            </div>
-          } @else if (feedbackService.tipo() === 'warning') {
-            <div class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/50 flex items-center justify-center text-xs font-black shadow-xs">
-              !
-            </div>
-          } @else {
-            <div class="w-6 h-6 rounded-full bg-red-500/20 text-red-400 border border-red-500/50 flex items-center justify-center text-xs font-black shadow-xs">
+    <!-- Pestañita Flotante Centrada Garantizada en la parte superior -->
+    <div class="floating-pill-container no-print">
+      <div class="animate-floating-pill pointer-events-auto max-w-[94vw] sm:max-w-md w-auto">
+        <div class="px-4 sm:px-5 py-2.5 sm:py-3 rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.35)] border flex items-center gap-3 backdrop-blur-2xl transition-all duration-300"
+          [ngClass]="feedbackService.tipo() === 'loading'
+            ? 'bg-slate-950/95 text-white border-slate-700/80 shadow-slate-950/50'
+            : (feedbackService.tipo() === 'success'
+              ? 'bg-slate-950/95 text-white border-emerald-500/60 shadow-emerald-950/40'
+              : (feedbackService.tipo() === 'warning'
+                ? 'bg-slate-950/95 text-white border-amber-500/60 shadow-amber-950/40'
+                : 'bg-slate-950/95 text-white border-red-500/60 shadow-red-950/40'))">
+          
+          <!-- Icono Dinámico según Estado -->
+          <div class="shrink-0 flex items-center justify-center">
+            @if (feedbackService.tipo() === 'loading') {
+              <div class="relative flex items-center justify-center w-6 h-6">
+                <span class="absolute w-6 h-6 rounded-full bg-amber-400/20 animate-ping"></span>
+                <svg class="w-5 h-5 animate-spin text-amber-400" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+              </div>
+            } @else if (feedbackService.tipo() === 'success') {
+              <div class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/50 flex items-center justify-center text-xs font-black shadow-xs">
+                ✓
+              </div>
+            } @else if (feedbackService.tipo() === 'warning') {
+              <div class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/50 flex items-center justify-center text-xs font-black shadow-xs">
+                !
+              </div>
+            } @else {
+              <div class="w-6 h-6 rounded-full bg-red-500/20 text-red-400 border border-red-500/50 flex items-center justify-center text-xs font-black shadow-xs">
+                ✕
+              </div>
+            }
+          </div>
+
+          <!-- Mensajes de Estado -->
+          <div class="flex flex-col min-w-0 pr-1">
+            <span class="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight truncate">
+              {{ feedbackService.mensaje() }}
+            </span>
+            <span class="text-[10px] sm:text-[11px] font-medium leading-tight truncate"
+              [ngClass]="feedbackService.tipo() === 'loading'
+                ? 'text-slate-300'
+                : (feedbackService.tipo() === 'success'
+                  ? 'text-emerald-400'
+                  : (feedbackService.tipo() === 'warning' ? 'text-amber-300' : 'text-red-300'))">
+              {{ feedbackService.subtitulo() }}
+            </span>
+          </div>
+
+          <!-- Botón de Cerrar si ya concluyó -->
+          @if (!feedbackService.cargando()) {
+            <button type="button" (click)="feedbackService.ocultar()"
+              class="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors ml-1 cursor-pointer">
               ✕
-            </div>
+            </button>
           }
         </div>
-
-        <!-- Mensajes de Estado -->
-        <div class="flex flex-col min-w-0 pr-1">
-          <span class="text-xs sm:text-sm font-bold tracking-tight text-white leading-tight truncate">
-            {{ feedbackService.mensaje() }}
-          </span>
-          <span class="text-[10px] sm:text-[11px] font-medium leading-tight truncate"
-            [ngClass]="feedbackService.tipo() === 'loading'
-              ? 'text-slate-300'
-              : (feedbackService.tipo() === 'success'
-                ? 'text-emerald-400'
-                : (feedbackService.tipo() === 'warning' ? 'text-amber-300' : 'text-red-300'))">
-            {{ feedbackService.subtitulo() }}
-          </span>
-        </div>
-
-        <!-- Botón de Cerrar si ya concluyó -->
-        @if (!feedbackService.cargando()) {
-          <button type="button" (click)="feedbackService.ocultar()"
-            class="w-5 h-5 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center text-[10px] font-bold transition-colors ml-1 cursor-pointer">
-            ✕
-          </button>
-        }
       </div>
     </div>
   }
