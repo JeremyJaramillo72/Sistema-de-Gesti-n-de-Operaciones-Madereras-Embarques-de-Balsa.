@@ -5,6 +5,8 @@ import { ActivatedRoute } from '@angular/router';
 import { DataService } from '../../core/services/data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { FeedbackService } from '../../core/services/feedback.service';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export interface FaenaAuditoria {
   numero: string;
@@ -311,13 +313,290 @@ export class ReportesComponent {
     }
   }
 
-  // Generar Reporte PDF (Activa directamente la vista y diálogo de impresión a PDF)
-  generarReporte() {
-    this.imprimirReporte();
+  // Generar Reporte PDF Oficial y Descargar o Compartir
+  async generarReporte() {
+    await this.generarReportePDF();
+  }
+
+  async generarReportePDF() {
+    if (this.guardando()) return;
+    const faenas = this.turnosFiltrados();
+
+    if (faenas.length === 0) {
+      this.feedbackService.finalizarAdvertencia('No hay faenas en el filtro actual para generar el PDF');
+      return;
+    }
+
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga('Generando reporte PDF...', 'Preparando documento oficial...');
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // 1. ENCABEZADO / MEMBRETE EJECUTIVO
+      doc.setFillColor(15, 23, 42); // Navy Slate 900
+      doc.rect(14, 12, 4, 14, 'F'); // Barra acento izquierda
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text('BOYACONTROL', 21, 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('SISTEMA OFICIAL DE AUDITORÍA Y LIQUIDACIÓN • PATIO 01', 21, 23);
+
+      // Título del documento según filtro
+      const tipoOp = this.filtroTipoOperacion();
+      const tituloDoc = tipoOp === 'DESCARGA'
+        ? 'AUDITORÍA DE BAJADA DE MADERA (CARROS)'
+        : tipoOp === 'EMBARQUE'
+          ? 'AUDITORÍA DE EMBARQUE DE TRÁILERS'
+          : 'AUDITORÍA Y BALANCE OFICIAL DE CUADRILLA';
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(15, 23, 42);
+      doc.text(tituloDoc, 14, 33);
+
+      // Metadatos a la derecha
+      const emp = this.trabajadorSeleccionado();
+      const periodoTexto = (this.fechaDesde() || this.fechaHasta())
+        ? `${this.fechaDesde() || 'Inicio'} al ${this.fechaHasta() || 'Hoy'}`
+        : (this.filtroPeriodo() === 'todo' ? 'HISTORIAL COMPLETO' : this.filtroPeriodo().toUpperCase());
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Fecha Emisión: ${this.fechaHoy}`, pageWidth - 14, 18, { align: 'right' });
+      doc.text(`Período: ${periodoTexto}`, pageWidth - 14, 23, { align: 'right' });
+      if (emp) {
+        doc.text(`Trabajador: ${emp}`, pageWidth - 14, 28, { align: 'right' });
+      }
+
+      // Línea divisoria
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.4);
+      doc.line(14, 36, pageWidth - 14, 36);
+
+      // 2. CUATRO CAJAS DE MÉTRICAS FINANCIERAS
+      const cardY = 40;
+      const cardWidth = (pageWidth - 28 - 9) / 4; // 4 cajas con 3mm gap
+      const cardHeight = 15;
+
+      const metricas = [
+        { label: 'JORNADAS / FAENAS', valor: `${faenas.length}`, highlight: false },
+        { label: 'TOTAL GENERADO', valor: `$${this.totalRecaudacion().toFixed(2)}`, highlight: false },
+        { label: 'YA PAGADO / COBRADO', valor: `$${this.totalPagadoCalculado().toFixed(2)}`, highlight: false },
+        { label: 'SALDO POR LIQUIDAR', valor: `$${this.totalDiferencia().toFixed(2)}`, highlight: true }
+      ];
+
+      metricas.forEach((m, idx) => {
+        const x = 14 + idx * (cardWidth + 3);
+        if (m.highlight) {
+          doc.setFillColor(241, 245, 249);
+          doc.setDrawColor(15, 23, 42);
+        } else {
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(226, 232, 240);
+        }
+        doc.roundedRect(x, cardY, cardWidth, cardHeight, 1.5, 1.5, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(m.label, x + cardWidth / 2, cardY + 5, { align: 'center' });
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(m.highlight ? 15 : 30, m.highlight ? 23 : 41, m.highlight ? 42 : 59);
+        doc.text(m.valor, x + cardWidth / 2, cardY + 11.5, { align: 'center' });
+      });
+
+      let currentY = cardY + cardHeight + 8;
+
+      // 3. TABLA 1: BALANCE INDIVIDUAL POR TRABAJADOR
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('1. BALANCE Y LIQUIDACIÓN POR TRABAJADOR', 14, currentY);
+      currentY += 3;
+
+      const filasResumen: any[] = this.resumenTrabajadores().map(r => [
+        r.nombre,
+        `${r.cantidad_faenas}`,
+        `$${r.total_ganado.toFixed(2)}`,
+        `$${r.total_pagado.toFixed(2)}`,
+        `$${r.total_pendiente.toFixed(2)}`,
+        '____________________'
+      ]);
+
+      // Fila de totales
+      filasResumen.push([
+        'TOTAL GENERAL',
+        `${faenas.length}`,
+        `$${this.totalRecaudacion().toFixed(2)}`,
+        `$${this.totalPagadoCalculado().toFixed(2)}`,
+        `$${this.totalDiferencia().toFixed(2)}`,
+        ''
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: 14, right: 14 },
+        head: [['TRABAJADOR', 'FAENAS', 'TOTAL GANADO', 'YA PAGADO', 'SALDO PENDIENTE', 'FIRMA CONFORME']],
+        body: filasResumen,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7.5,
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 7.5,
+          textColor: [30, 41, 59]
+        },
+        columnStyles: {
+          0: { halign: 'left', fontStyle: 'bold' },
+          1: { halign: 'center' },
+          2: { halign: 'right' },
+          3: { halign: 'right' },
+          4: { halign: 'right', fontStyle: 'bold' },
+          5: { halign: 'center', textColor: [148, 163, 184] }
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        didParseCell: (data) => {
+          if (data.row.index === filasResumen.length - 1) {
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fillColor = [241, 245, 249];
+          }
+        }
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 8;
+
+      // 4. TABLA 2: DETALLE CRONOLÓGICO DE FAENAS
+      if (currentY + 28 > pageHeight) {
+        doc.addPage();
+        currentY = 16;
+      }
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text('2. DETALLE CRONOLÓGICO DE MOVIMIENTOS Y JORNALES', 14, currentY);
+      currentY += 3;
+
+      const filasDetalle = faenas.map(f => [
+        f.numero,
+        f.fecha,
+        f.trabajador,
+        f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
+        f.detalle,
+        `$${f.monto.toFixed(2)}`,
+        f.estado
+      ]);
+
+      autoTable(doc, {
+        startY: currentY,
+        margin: { left: 14, right: 14 },
+        head: [['#', 'FECHA', 'TRABAJADOR', 'OPERACIÓN', 'DETALLE FAENA', 'MONTO', 'ESTADO']],
+        body: filasDetalle,
+        theme: 'striped',
+        headStyles: {
+          fillColor: [30, 41, 59],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 7,
+          halign: 'center'
+        },
+        bodyStyles: {
+          fontSize: 7,
+          textColor: [30, 41, 59]
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 14 },
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'left', cellWidth: 32, fontStyle: 'bold' },
+          3: { halign: 'center', cellWidth: 26 },
+          4: { halign: 'left' },
+          5: { halign: 'right', cellWidth: 20, fontStyle: 'bold' },
+          6: { halign: 'center', cellWidth: 22 }
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        }
+      });
+
+      // 5. PIE DE PÁGINA EN TODAS LAS PÁGINAS
+      const totalPaginas = doc.getNumberOfPages();
+      for (let i = 1; i <= totalPaginas; i++) {
+        doc.setPage(i);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, pageHeight - 10, pageWidth - 14, pageHeight - 10);
+        doc.text(`BoyaControl • Documento Oficial de Auditoría y Liquidación • Patio de Acopio`, 14, pageHeight - 6);
+        doc.text(`Página ${i} de ${totalPaginas}`, pageWidth - 14, pageHeight - 6, { align: 'right' });
+      }
+
+      // 6. DESCARGA DIRECTA O COMPARTIR NATIVO EN MÓVIL
+      const nombreArchivo = `reporte-boyacontrol-${this.fechaHoy}.pdf`;
+      const pdfBlob = doc.output('blob');
+
+      // Si el navegador soporta compartir archivos (iOS Safari, Android Chrome, etc.)
+      if (typeof navigator !== 'undefined' && 'canShare' in navigator && (navigator as any).canShare) {
+        try {
+          const pdfFile = new File([pdfBlob], nombreArchivo, { type: 'application/pdf' });
+          if ((navigator as any).canShare({ files: [pdfFile] })) {
+            await navigator.share({
+              title: 'Reporte Oficial BoyaControl',
+              text: `Reporte de liquidación y faenas - ${this.fechaHoy}`,
+              files: [pdfFile]
+            });
+            this.feedbackService.finalizarExito('¡Reporte PDF generado y compartido con éxito!');
+            return;
+          }
+        } catch (shareErr: any) {
+          if (shareErr.name === 'AbortError') {
+            this.feedbackService.ocultar();
+            return;
+          }
+        }
+      }
+
+      // Descarga directa a través de jsPDF
+      doc.save(nombreArchivo);
+      this.feedbackService.finalizarExito('¡Reporte PDF descargado con éxito!');
+    } catch (e) {
+      console.error('Error generando PDF:', e);
+      this.feedbackService.finalizarError('Error generando el archivo PDF');
+    } finally {
+      this.guardando.set(false);
+    }
   }
 
   exportarCSV() {
-    const filas = this.turnosFiltrados().map(t => ({
+    const faenas = this.turnosFiltrados();
+    if (faenas.length === 0) {
+      this.feedbackService.finalizarAdvertencia('No hay faenas en el filtro actual para exportar');
+      return;
+    }
+
+    const filas = faenas.map(t => ({
       '# Registro': t.numero,
       Trabajador: t.trabajador,
       Fecha: t.fecha,
@@ -344,7 +623,7 @@ export class ReportesComponent {
         : 'General';
 
     this.dataService.exportarCSV(filas, nombreArchivo);
-    this.mostrarNotificacion(`Reporte CSV (${etiqueta}) exportado`);
+    this.feedbackService.finalizarExito(`Reporte CSV (${etiqueta}) exportado con éxito`);
   }
 
   imprimirReporte() {
