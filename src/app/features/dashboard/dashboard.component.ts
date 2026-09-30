@@ -193,7 +193,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
           subtitulo: trabs.map(t => t.trabajador_nombre).join(', '),
           monto: esAdmin ? d.total_pago : (mi ? mi.monto_individual : (d.total_pago / (trabs.length || 1))),
           totalCarro: d.total_pago,
-          pagado: esAdmin ? true : (mi ? mi.pagado : trabs.every(t => t.pagado))
+          pagado: trabs.length > 0 ? (esAdmin ? trabs.every(t => t.pagado) : (mi ? mi.pagado : trabs.every(t => t.pagado))) : false
         };
       });
 

@@ -20,7 +20,7 @@ export interface FaenaAuditoria {
   pagado: boolean;
   montoPagado: number;
   montoPendiente: number;
-  estado: 'Por Liquidar' | 'Pagado' | 'Pago Chofer';
+  estado: 'Por Liquidar' | 'Pagado' | 'Cobrado' | 'Por Cobrar';
   operacionId: string;
 }
 
@@ -151,10 +151,10 @@ export class ReportesComponent {
           detalle: `${d.cantidad_carros} Carro(s) • ${d.filas_por_carro} filas ($${d.total_pago.toFixed(2)} total ÷ ${cantPers} pers.)`,
           observaciones: d.observaciones,
           monto: t.monto_individual,
-          pagado: esAdmin ? true : t.pagado,
-          montoPagado: esAdmin ? 0 : (t.pagado ? t.monto_individual : 0),
-          montoPendiente: esAdmin ? 0 : (t.pagado ? 0 : t.monto_individual),
-          estado: esAdmin ? 'Pago Chofer' : (t.pagado ? 'Pagado' : 'Por Liquidar'),
+          pagado: !!t.pagado,
+          montoPagado: t.pagado ? t.monto_individual : 0,
+          montoPendiente: t.pagado ? 0 : t.monto_individual,
+          estado: t.pagado ? 'Cobrado' : 'Por Cobrar',
           operacionId: d.id
         });
       });
@@ -164,6 +164,7 @@ export class ReportesComponent {
     embarques.forEach((e, eIdx) => {
       e.trabajadores.forEach((t, tIdx) => {
         const numRegistro = '#' + (100 + eIdx * 10 + tIdx);
+        const estaPagado = !!t.pagado;
         lista.push({
           numero: numRegistro,
           trabajador: t.trabajador_nombre || 'Trabajador',
@@ -173,10 +174,10 @@ export class ReportesComponent {
           detalle: `${e.cantidad_trailers} Tráiler(s) de Bloques ($7.00/pers)`,
           observaciones: e.observaciones,
           monto: t.monto_individual,
-          pagado: t.pagado,
-          montoPagado: t.pagado ? t.monto_individual : 0,
-          montoPendiente: t.pagado ? 0 : t.monto_individual,
-          estado: t.pagado ? 'Pagado' : 'Por Liquidar',
+          pagado: estaPagado,
+          montoPagado: estaPagado ? t.monto_individual : 0,
+          montoPendiente: estaPagado ? 0 : t.monto_individual,
+          estado: estaPagado ? 'Pagado' : 'Por Liquidar',
           operacionId: e.id
         });
       });
@@ -200,10 +201,6 @@ export class ReportesComponent {
         }
       }
 
-      // Si es Admin y se busca a un empleado/trabajador en particular, mostrar exclusivamente sus tráilers
-      if (esAdmin && emp && item.tipo === 'DESCARGA') {
-        return false;
-      }
 
       // Filtro por tipo de operación (DESCARGA vs EMBARQUE)
       if (tipoOp !== 'TODOS' && item.tipo !== tipoOp) return false;
@@ -245,35 +242,21 @@ export class ReportesComponent {
   });
 
   totalRecaudacion = computed(() => {
-    return this.turnosFiltrados().reduce((sum, t) => {
-      if (this.authService.esAdmin() && t.tipo === 'DESCARGA') return sum;
-      return sum + t.monto;
-    }, 0);
+    return this.turnosFiltrados().reduce((sum, t) => sum + t.monto, 0);
   });
 
   totalDiferencia = computed(() => {
-    return this.turnosFiltrados().reduce((sum, t) => {
-      if (this.authService.esAdmin() && t.tipo === 'DESCARGA') return sum;
-      return sum + t.montoPendiente;
-    }, 0);
+    return this.turnosFiltrados().reduce((sum, t) => sum + t.montoPendiente, 0);
   });
 
   totalPagadoCalculado = computed(() => {
-    return this.turnosFiltrados().reduce((sum, t) => {
-      if (this.authService.esAdmin() && t.tipo === 'DESCARGA') return sum;
-      return sum + t.montoPagado;
-    }, 0);
+    return this.turnosFiltrados().reduce((sum, t) => sum + t.montoPagado, 0);
   });
 
   resumenTrabajadores = computed<ResumenTrabajador[]>(() => {
     const mapa = new Map<string, ResumenTrabajador>();
 
     for (const t of this.turnosFiltrados()) {
-      // Para el Admin, descargas de boya NO se suman a la cuenta de ninguna persona
-      if (this.authService.esAdmin() && t.tipo === 'DESCARGA') {
-        continue;
-      }
-
       if (!mapa.has(t.trabajadorId)) {
         mapa.set(t.trabajadorId, {
           id: t.trabajadorId,
@@ -302,12 +285,21 @@ export class ReportesComponent {
     if (this.guardando()) return;
     this.guardando.set(true);
     const nuevoEstado = !t.pagado;
-    this.feedbackService.iniciarCarga(nuevoEstado ? `Registrando pago de ${t.trabajador}...` : `Desmarcando pago de ${t.trabajador}...`);
+    const esDescarga = t.tipo === 'DESCARGA';
+    this.feedbackService.iniciarCarga(
+      nuevoEstado
+        ? (esDescarga ? `Registrando cobro de ${t.trabajador}...` : `Registrando pago de ${t.trabajador}...`)
+        : (esDescarga ? `Desmarcando cobro de ${t.trabajador}...` : `Desmarcando pago de ${t.trabajador}...`)
+    );
     try {
       await this.dataService.cambiarEstadoPago(t.tipo, t.operacionId, t.trabajadorId, nuevoEstado);
-      this.feedbackService.finalizarExito(nuevoEstado ? `Faena de ${t.trabajador} marcada como pagada` : `Pago de ${t.trabajador} desmarcado`);
+      this.feedbackService.finalizarExito(
+        nuevoEstado
+          ? (esDescarga ? `Faena de ${t.trabajador} marcada como cobrada` : `Faena de ${t.trabajador} marcada como pagada`)
+          : (esDescarga ? `Cobro de ${t.trabajador} desmarcado` : `Pago de ${t.trabajador} desmarcado`)
+      );
     } catch (err) {
-      this.feedbackService.finalizarError('Error al actualizar estado de pago');
+      this.feedbackService.finalizarError('Error al actualizar estado');
     } finally {
       this.guardando.set(false);
     }
@@ -392,11 +384,14 @@ export class ReportesComponent {
       const cardWidth = (pageWidth - 28 - 9) / 4; // 4 cajas con 3mm gap
       const cardHeight = 15;
 
+      const labelPagado = tipoOp === 'DESCARGA' ? 'YA COBRADO' : (tipoOp === 'EMBARQUE' ? 'YA PAGADO' : 'YA PAGADO / COBRADO');
+      const labelPendiente = tipoOp === 'DESCARGA' ? 'SALDO POR COBRAR' : (tipoOp === 'EMBARQUE' ? 'SALDO POR LIQUIDAR' : 'SALDO POR LIQUIDAR');
+
       const metricas = [
         { label: 'JORNADAS / FAENAS', valor: `${faenas.length}`, highlight: false },
         { label: 'TOTAL GENERADO', valor: `$${this.totalRecaudacion().toFixed(2)}`, highlight: false },
-        { label: 'YA PAGADO / COBRADO', valor: `$${this.totalPagadoCalculado().toFixed(2)}`, highlight: false },
-        { label: 'SALDO POR LIQUIDAR', valor: `$${this.totalDiferencia().toFixed(2)}`, highlight: true }
+        { label: labelPagado, valor: `$${this.totalPagadoCalculado().toFixed(2)}`, highlight: false },
+        { label: labelPendiente, valor: `$${this.totalDiferencia().toFixed(2)}`, highlight: true }
       ];
 
       metricas.forEach((m, idx) => {
@@ -449,10 +444,13 @@ export class ReportesComponent {
         ''
       ]);
 
+      const colPagado = tipoOp === 'DESCARGA' ? 'YA COBRADO' : (tipoOp === 'EMBARQUE' ? 'YA PAGADO' : 'YA PAGADO / COBRADO');
+      const colPendiente = tipoOp === 'DESCARGA' ? 'POR COBRAR' : (tipoOp === 'EMBARQUE' ? 'SALDO PENDIENTE' : 'SALDO PENDIENTE');
+
       autoTable(doc, {
         startY: currentY,
         margin: { left: 14, right: 14 },
-        head: [['TRABAJADOR', 'FAENAS', 'TOTAL GANADO', 'YA PAGADO', 'SALDO PENDIENTE', 'FIRMA CONFORME']],
+        head: [['TRABAJADOR', 'FAENAS', 'TOTAL GANADO', colPagado, colPendiente, 'FIRMA CONFORME']],
         body: filasResumen,
         theme: 'grid',
         headStyles: {

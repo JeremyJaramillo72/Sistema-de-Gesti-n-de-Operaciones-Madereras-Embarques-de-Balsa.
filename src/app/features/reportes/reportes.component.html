@@ -123,7 +123,7 @@
             {{ turnosPendientesCount() }} <span class="text-sm font-semibold text-slate-400">pend.</span>
           </div>
           <p class="text-xs text-slate-400 mt-1 font-medium">
-            Faenas por liquidar en cuadrilla
+            {{ filtroTipoOperacion() === 'DESCARGA' ? 'Faenas pendientes por cobrar' : 'Faenas por liquidar en cuadrilla' }}
           </p>
         </div>
       </div>
@@ -149,10 +149,12 @@
         </div>
       </div>
 
-      <!-- Tarjeta 4: Saldo por Liquidar -->
+      <!-- Tarjeta 4: Saldo por Liquidar / Por Cobrar -->
       <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Saldo por Liquidar</span>
+          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            {{ filtroTipoOperacion() === 'DESCARGA' ? 'Saldo por Cobrar' : 'Saldo por Liquidar' }}
+          </span>
           <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-200/40">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
@@ -166,7 +168,7 @@
             ${{ totalDiferencia() | number:'1.2-2' }}
           </div>
           <p class="text-xs text-slate-400 mt-1 font-medium">
-            Monto pendiente de liquidación
+            {{ filtroTipoOperacion() === 'DESCARGA' ? 'Monto pendiente de cobro' : 'Monto pendiente de liquidación' }}
           </p>
         </div>
       </div>
@@ -252,12 +254,12 @@
               <button (click)="filtroEstado.set('abiertos')"
                 [ngClass]="filtroEstado() === 'abiertos' ? 'bg-white font-bold text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'"
                 class="px-2.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer">
-                Por Liquidar
+                {{ filtroTipoOperacion() === 'DESCARGA' ? 'Por Cobrar' : 'Por Liquidar' }}
               </button>
               <button (click)="filtroEstado.set('cerrados')"
                 [ngClass]="filtroEstado() === 'cerrados' ? 'bg-white font-bold text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'"
                 class="px-2.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer">
-                Pagados
+                {{ filtroTipoOperacion() === 'DESCARGA' ? 'Cobrados' : 'Pagados' }}
               </button>
             </div>
           </div>
@@ -459,9 +461,9 @@
               <th class="px-4 py-3">Trabajador</th>
               <th class="px-4 py-3">Operación</th>
               <th class="px-4 py-3">Detalle Faena</th>
-              <th class="px-4 py-3 text-right">Monto a Cobrar</th>
-              <th class="px-4 py-3 text-right">Pagado / Cobrado</th>
-              <th class="px-4 py-3 text-right">Por Liquidar</th>
+              <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Monto a Cobrar' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Monto a Pagar' : 'Monto Faena') }}</th>
+              <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Cobrado' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Pagado' : 'Pagado / Cobrado') }}</th>
+              <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Por Cobrar' : 'Por Liquidar' }}</th>
               <th class="px-4 py-3 text-center">Estado</th>
               <th class="px-4 py-3 text-center">Acciones</th>
             </tr>

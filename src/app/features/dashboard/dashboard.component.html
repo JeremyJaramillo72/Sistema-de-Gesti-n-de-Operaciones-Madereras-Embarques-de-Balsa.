@@ -88,7 +88,7 @@
           </span>
         </div>
         <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/80">
-          {{ authService.esAdmin() ? 'Pago Chofer' : 'Mi Ganancia' }}
+          {{ authService.esAdmin() ? 'Por Cobrar' : 'Mi Ganancia' }}
         </span>
       </div>
 
@@ -99,7 +99,7 @@
           </div>
           <div class="flex items-center justify-between text-xs text-slate-500 mt-1 font-medium">
             <span>{{ misDescargasCount() }} faena(s) de bajada</span>
-            <span class="text-slate-400 font-normal">Pago Chofer</span>
+            <span class="text-slate-400 font-normal">Por Cobrar</span>
           </div>
         } @else {
           <div class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight font-mono">
@@ -385,8 +385,8 @@
               <div class="text-right shrink-0">
                 <span class="font-bold text-slate-900 font-mono block">${{ op.monto | number:'1.2-2' }}</span>
                 <span class="inline-block text-[10px] font-bold px-1.5 py-0.2 rounded-md"
-                  [ngClass]="(authService.esAdmin() && op.tipo === 'DESCARGA') ? 'bg-slate-100 text-slate-600 border border-slate-200/80' : (op.pagado ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60')">
-                  {{ (authService.esAdmin() && op.tipo === 'DESCARGA') ? 'Pago Chofer' : (op.pagado ? 'Pagado' : 'Pendiente') }}
+                  [ngClass]="op.pagado ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'">
+                  {{ op.tipo === 'DESCARGA' ? (op.pagado ? 'Cobrado' : 'Por Cobrar') : (op.pagado ? 'Pagado' : 'Pendiente') }}
                 </span>
               </div>
             </div>
