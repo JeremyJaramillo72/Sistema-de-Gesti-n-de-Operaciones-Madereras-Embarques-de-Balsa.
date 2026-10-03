@@ -26,6 +26,20 @@ export interface FaenaAuditoria {
   operacionId: string;
 }
 
+export interface GrupoEmbarqueReporte {
+  operacionId: string;
+  numeroEmbarque: string;
+  fecha: string;
+  diaSemana: string;
+  cantidad_trailers: number;
+  total_pago: number;
+  observaciones?: string;
+  turnos: FaenaAuditoria[];
+  todosPagados: boolean;
+  totalPendiente: number;
+  totalPagado: number;
+}
+
 export interface ResumenTrabajador {
   id: string;
   nombre: string;
@@ -318,6 +332,62 @@ export class ReportesComponent {
     return Array.from(mapa.values()).sort((a, b) => b.total_pendiente - a.total_pendiente);
   });
 
+  embarquesAgrupados = computed<GrupoEmbarqueReporte[]>(() => {
+    const turnos = this.turnosFiltrados().filter(t => t.tipo === 'EMBARQUE');
+    const embarquesRaw = this.dataService.misEmbarques();
+    const mapaRaw = new Map(embarquesRaw.map((e, idx) => [e.id, { e, index: idx + 1 }]));
+
+    const gruposMap = new Map<string, GrupoEmbarqueReporte>();
+
+    for (const t of turnos) {
+      if (!gruposMap.has(t.operacionId)) {
+        const info = mapaRaw.get(t.operacionId);
+        gruposMap.set(t.operacionId, {
+          operacionId: t.operacionId,
+          numeroEmbarque: '#' + (info ? info.index : (gruposMap.size + 1)),
+          fecha: t.fecha,
+          diaSemana: t.diaSemana,
+          cantidad_trailers: info?.e.cantidad_trailers || 1,
+          total_pago: info?.e.total_pago || (t.monto * 4),
+          observaciones: t.observaciones || info?.e.observaciones,
+          turnos: [],
+          todosPagados: false,
+          totalPendiente: 0,
+          totalPagado: 0
+        });
+      }
+      gruposMap.get(t.operacionId)!.turnos.push(t);
+    }
+
+    const lista = Array.from(gruposMap.values());
+    for (const g of lista) {
+      g.todosPagados = g.turnos.length > 0 && g.turnos.every(item => item.pagado);
+      g.totalPendiente = g.turnos.reduce((acc, item) => acc + item.montoPendiente, 0);
+      g.totalPagado = g.turnos.reduce((acc, item) => acc + item.montoPagado, 0);
+    }
+
+    return lista;
+  });
+
+  esModoAgrupadoEmbarques = computed(() => {
+    return this.filtroTipoOperacion() === 'EMBARQUE' && !this.trabajadorSeleccionado();
+  });
+
+  async pagarEmbarqueCompleto(grupo: GrupoEmbarqueReporte) {
+    if (this.guardando()) return;
+    this.guardando.set(true);
+    this.feedbackService.iniciarCarga(`Liquidando cuadrilla de Embarque ${grupo.numeroEmbarque}...`);
+    try {
+      await this.dataService.marcarOperacionCompletaPagada('EMBARQUE', grupo.operacionId);
+      this.feedbackService.finalizarExito(`Cuadrilla de Embarque ${grupo.numeroEmbarque} liquidada con éxito`);
+      this.mostrarNotificacion(`Embarque ${grupo.numeroEmbarque} marcado como liquidado`);
+    } catch (err) {
+      this.feedbackService.finalizarError('Error al liquidar cuadrilla de embarque');
+    } finally {
+      this.guardando.set(false);
+    }
+  }
+
   async togglePago(t: FaenaAuditoria) {
     if (this.guardando()) return;
     this.guardando.set(true);
@@ -332,7 +402,7 @@ export class ReportesComponent {
       await this.dataService.cambiarEstadoPago(t.tipo, t.operacionId, t.trabajadorId, nuevoEstado);
       this.feedbackService.finalizarExito(
         nuevoEstado
-          ? (esDescarga ? `Faena de ${t.trabajador} marcada como cobrada` : `Faena de ${t.trabajador} marcada como pagada`)
+          ? (esDescarga ? `Descarga de ${t.trabajador} marcada como cobrada` : `Embarque de ${t.trabajador} marcado como pagado`)
           : (esDescarga ? `Cobro de ${t.trabajador} desmarcado` : `Pago de ${t.trabajador} desmarcado`)
       );
     } catch (err) {
@@ -423,9 +493,11 @@ export class ReportesComponent {
 
       const labelPagado = tipoOp === 'DESCARGA' ? 'YA COBRADO' : (tipoOp === 'EMBARQUE' ? 'YA PAGADO' : 'YA PAGADO / COBRADO');
       const labelPendiente = tipoOp === 'DESCARGA' ? 'SALDO POR COBRAR' : (tipoOp === 'EMBARQUE' ? 'SALDO POR LIQUIDAR' : 'SALDO POR LIQUIDAR');
+      const labelTotal = tipoOp === 'EMBARQUE' ? 'TOTAL EMBARQUES' : (tipoOp === 'DESCARGA' ? 'TOTAL DESCARGAS' : 'JORNADAS / REGISTROS');
+      const cantTotal = (tipoOp === 'EMBARQUE' && !emp) ? `${this.embarquesAgrupados().length} desp.` : `${faenas.length}`;
 
       const metricas = [
-        { label: 'JORNADAS / FAENAS', valor: `${faenas.length}`, highlight: false },
+        { label: labelTotal, valor: cantTotal, highlight: false },
         { label: 'TOTAL GENERADO', valor: `$${this.totalRecaudacion().toFixed(2)}`, highlight: false },
         { label: labelPagado, valor: `$${this.totalPagadoCalculado().toFixed(2)}`, highlight: false },
         { label: labelPendiente, valor: `$${this.totalDiferencia().toFixed(2)}`, highlight: true }
@@ -481,13 +553,14 @@ export class ReportesComponent {
         ''
       ]);
 
+      const colFaenas = tipoOp === 'EMBARQUE' ? 'EMBARQUES' : (tipoOp === 'DESCARGA' ? 'DESCARGAS' : 'FAENAS');
       const colPagado = tipoOp === 'DESCARGA' ? 'YA COBRADO' : (tipoOp === 'EMBARQUE' ? 'YA PAGADO' : 'YA PAGADO / COBRADO');
       const colPendiente = tipoOp === 'DESCARGA' ? 'POR COBRAR' : (tipoOp === 'EMBARQUE' ? 'SALDO PENDIENTE' : 'SALDO PENDIENTE');
 
       autoTable(doc, {
         startY: currentY,
         margin: { left: 14, right: 14 },
-        head: [['TRABAJADOR', 'FAENAS', 'TOTAL GANADO', colPagado, colPendiente, 'FIRMA CONFORME']],
+        head: [['TRABAJADOR', colFaenas, 'TOTAL GANADO', colPagado, colPendiente, 'FIRMA CONFORME']],
         body: filasResumen,
         theme: 'grid',
         headStyles: {
@@ -522,55 +595,96 @@ export class ReportesComponent {
 
       currentY = (doc as any).lastAutoTable.finalY + 8;
 
-      // 4. TABLA 2: DETALLE CRONOLÓGICO DE FAENAS
+      // 4. TABLA 2: DETALLE CRONOLÓGICO DE EMBARQUES / FAENAS
       if (currentY + 28 > pageHeight) {
         doc.addPage();
         currentY = 16;
       }
 
+      const tituloTabla2 = tipoOp === 'EMBARQUE'
+        ? '2. DETALLE CRONOLÓGICO DE EMBARQUES DE TRÁILERS'
+        : (tipoOp === 'DESCARGA' ? '2. DETALLE CRONOLÓGICO DE BAJADAS DE MADERA' : '2. DETALLE CRONOLÓGICO DE MOVIMIENTOS Y JORNALES');
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9.5);
       doc.setTextColor(15, 23, 42);
-      doc.text('2. DETALLE CRONOLÓGICO DE MOVIMIENTOS Y JORNALES', 14, currentY);
+      doc.text(tituloTabla2, 14, currentY);
       currentY += 3;
 
-      const filasDetalle = faenas.map(f => {
-        let detalleTexto = '';
-        if (f.tipo === 'DESCARGA') {
-          if (f.companeros && f.companeros !== 'Solo') {
-            detalleTexto = `Descargó con: ${f.companeros}\n${f.detalle}`;
-          } else {
-            detalleTexto = `Descarga individual (Solo)\n${f.detalle}`;
-          }
-        } else {
-          if (f.companeros && f.companeros !== 'Solo') {
-            detalleTexto = `Cuadrilla: ${f.companeros}\n${f.detalle}`;
-          } else {
-            detalleTexto = f.detalle;
+      const filasDetalle: any[] = [];
+
+      if (tipoOp === 'EMBARQUE' && !emp) {
+        for (const grupo of this.embarquesAgrupados()) {
+          const obsTxt = grupo.observaciones ? ` • "${grupo.observaciones}"` : '';
+          const diaTxt = grupo.diaSemana ? ` (${grupo.diaSemana})` : '';
+
+          // Fila separadora destacada del embarque
+          filasDetalle.push([
+            {
+              content: `EMBARQUE ${grupo.numeroEmbarque}: ${grupo.cantidad_trailers} Tráiler(s) de Bloques • ${grupo.fecha}${diaTxt} • Cuadrilla (${grupo.turnos.length} cargadores a $7.00 c/u) • Total Nómina: $${grupo.total_pago.toFixed(2)}${obsTxt}`,
+              colSpan: 7,
+              styles: {
+                fillColor: [234, 240, 246],
+                textColor: [15, 23, 42],
+                fontStyle: 'bold',
+                fontSize: 7.5,
+                halign: 'left'
+              }
+            }
+          ]);
+
+          // Los 4 cargadores de dicho embarque
+          for (const f of grupo.turnos) {
+            filasDetalle.push([
+              f.numero,
+              f.fecha,
+              f.trabajador,
+              'Cargador Tráiler',
+              `${grupo.cantidad_trailers} Tráiler(s) ($7.00/pers)`,
+              `$${f.monto.toFixed(2)}`,
+              f.estado
+            ]);
           }
         }
+      } else {
+        for (const f of faenas) {
+          let detalleTexto = '';
+          if (f.tipo === 'DESCARGA') {
+            if (f.companeros && f.companeros !== 'Solo') {
+              detalleTexto = `Descargó con: ${f.companeros}\n${f.detalle}`;
+            } else {
+              detalleTexto = `Descarga individual (Solo)\n${f.detalle}`;
+            }
+          } else {
+            if (f.companeros && f.companeros !== 'Solo') {
+              detalleTexto = `Cuadrilla: ${f.companeros}\n${f.detalle}`;
+            } else {
+              detalleTexto = f.detalle;
+            }
+          }
 
-        if (f.observaciones) {
-          detalleTexto += `\n"${f.observaciones}"`;
+          if (f.observaciones) {
+            detalleTexto += `\n"${f.observaciones}"`;
+          }
+
+          const fechaTexto = f.diaSemana ? `${f.fecha}\n${f.diaSemana}` : f.fecha;
+
+          filasDetalle.push([
+            f.numero,
+            fechaTexto,
+            f.trabajador,
+            f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
+            detalleTexto,
+            `$${f.monto.toFixed(2)}`,
+            f.estado
+          ]);
         }
-
-        const fechaTexto = f.diaSemana ? `${f.fecha}\n${f.diaSemana}` : f.fecha;
-
-        return [
-          f.numero,
-          fechaTexto,
-          f.trabajador,
-          f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
-          detalleTexto,
-          `$${f.monto.toFixed(2)}`,
-          f.estado
-        ];
-      });
+      }
 
       autoTable(doc, {
         startY: currentY,
         margin: { left: 14, right: 14 },
-        head: [['#', 'FECHA', 'TRABAJADOR', 'OPERACIÓN', 'DETALLE FAENA', 'MONTO', 'ESTADO']],
+        head: [['#', 'FECHA', 'TRABAJADOR', 'OPERACIÓN', tipoOp === 'EMBARQUE' ? 'DETALLE EMBARQUE' : 'DETALLE OPERACIÓN', 'MONTO', 'ESTADO']],
         body: filasDetalle,
         theme: 'striped',
         headStyles: {

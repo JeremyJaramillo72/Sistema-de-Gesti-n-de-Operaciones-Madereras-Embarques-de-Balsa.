@@ -83,10 +83,10 @@
     <!-- 2. CUATRO TARJETAS DE MÉTRICAS EJECUTIVAS -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       
-      <!-- Tarjeta 1: Total Faenas -->
+      <!-- Tarjeta 1: Total Faenas / Embarques -->
       <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Historial de Faenas</span>
+          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{{ filtroTipoOperacion() === 'EMBARQUE' ? 'Historial de Embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Historial de Descargas' : 'Historial de Operaciones') }}</span>
           <div class="w-8 h-8 rounded-xl bg-slate-100/80 flex items-center justify-center text-slate-600">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -99,18 +99,18 @@
         </div>
         <div class="mt-3">
           <div class="text-3xl font-extrabold text-slate-900 tracking-tight font-mono">
-            {{ turnosFiltrados().length }}
+            {{ esModoAgrupadoEmbarques() ? embarquesAgrupados().length : turnosFiltrados().length }}
           </div>
           <p class="text-xs text-slate-400 mt-1 font-medium">
-            Registros en el filtro actual
+            {{ esModoAgrupadoEmbarques() ? 'Embarques registrados (' + turnosFiltrados().length + ' jornales)' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Registros de cuadrilla en embarques' : 'Registros en el filtro actual') }}
           </p>
         </div>
       </div>
 
-      <!-- Tarjeta 2: Faenas Pendientes -->
+      <!-- Tarjeta 2: Faenas / Embarques Pendientes -->
       <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-[0_1px_3px_rgba(0,0,0,0.02)] transition-all">
         <div class="flex items-center justify-between">
-          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Estado de Nómina</span>
+          <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{{ filtroTipoOperacion() === 'EMBARQUE' ? 'Embarques por Liquidar' : (filtroTipoOperacion() === 'DESCARGA' ? 'Descargas por Cobrar' : 'Estado de Nómina') }}</span>
           <div class="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-200/40">
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"/>
@@ -123,7 +123,7 @@
             {{ turnosPendientesCount() }} <span class="text-sm font-semibold text-slate-400">pend.</span>
           </div>
           <p class="text-xs text-slate-400 mt-1 font-medium">
-            {{ filtroTipoOperacion() === 'DESCARGA' ? 'Faenas pendientes por cobrar' : 'Faenas por liquidar en cuadrilla' }}
+            {{ filtroTipoOperacion() === 'DESCARGA' ? 'Descargas pendientes por cobrar' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Cargadores pendientes por liquidar' : 'Operaciones por liquidar en cuadrilla') }}
           </p>
         </div>
       </div>
@@ -144,7 +144,7 @@
             ${{ totalRecaudacion() | number:'1.2-2' }}
           </div>
           <p class="text-xs text-slate-400 mt-1 font-medium">
-            Monto total generado en faenas
+            {{ filtroTipoOperacion() === 'EMBARQUE' ? 'Monto total generado en embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Monto total generado en descargas' : 'Monto total generado en operaciones') }}
           </p>
         </div>
       </div>
@@ -194,7 +194,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
-          <!-- Operación Segmented Pills (Todas / Bajada Carros / Tráilers) -->
+          <!-- Operación Segmented Pills (Todas / Bajada Carros / Embarques) -->
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">OPERACIÓN:</span>
             <div class="bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 flex items-center gap-0.5 text-xs">
@@ -213,7 +213,7 @@
                 [ngClass]="filtroTipoOperacion() === 'EMBARQUE' ? 'bg-[#0f172a] font-bold text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'"
                 class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold cursor-pointer">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="13" x="1" y="6" rx="2"/><path d="M17 9h4l3 3v4h-7"/></svg>
-                <span>Tráilers</span>
+                <span>Embarques</span>
               </button>
             </div>
           </div>
@@ -237,7 +237,7 @@
               <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">CUENTA:</span>
               <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
                 <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-                Mis Faenas ({{ authService.usuarioActual()?.nombre }})
+                {{ filtroTipoOperacion() === 'EMBARQUE' ? 'Mis Embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Mis Descargas' : 'Mis Registros') }} ({{ authService.usuarioActual()?.nombre }})
               </span>
             </div>
           }
@@ -397,75 +397,172 @@
     <!-- 4. TABLA DE AUDITORÍA EN PANTALLA -->
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] overflow-hidden">
       
-      <!-- VISTA MÓVIL (Tarjetas de Faena) -->
+      <!-- VISTA MÓVIL (Tarjetas de Faena / Embarque) -->
       <div class="md:hidden divide-y divide-slate-100">
-        @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
-          <div class="p-4 space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="font-mono text-xs font-semibold text-slate-500">{{ t.numero }}</span>
-                <span class="text-xs font-bold text-slate-900">{{ t.trabajador }}</span>
-              </div>
-              <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
-                [ngClass]="!t.pagado ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'">
-                {{ t.estado }}
-              </span>
-            </div>
-
-            <div class="flex items-center justify-between text-xs">
-              <div>
-                <span class="text-slate-700 font-mono font-bold">{{ t.fecha }}</span>
-                @if (t.diaSemana) {
-                  <span class="text-[11px] text-slate-400 ml-1.5 font-medium capitalize">({{ t.diaSemana }})</span>
-                }
-              </div>
-              <span class="font-bold text-sm text-slate-900 font-mono">${{ t.monto | number:'1.2-2' }}</span>
-            </div>
-
-            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs gap-2">
-              <div class="space-y-1">
-                @if (t.companeros) {
-                  <div class="flex items-center gap-1.5 text-[11px]">
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200/80 text-[10px]">
-                      <svg class="w-2.5 h-2.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        @if (esModoAgrupadoEmbarques()) {
+          <div class="p-3 space-y-4">
+            @for (grupo of embarquesAgrupados(); track grupo.operacionId) {
+              <div class="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-4 space-y-3.5">
+                <!-- Encabezado del Embarque -->
+                <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+                  <div class="flex items-start gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center justify-center shrink-0 mt-0.5">
+                      <svg class="w-4 h-4 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect width="16" height="13" x="1" y="6" rx="2"/>
+                        <path d="M17 9h4l3 3v4h-7"/>
+                        <circle cx="5.5" cy="18.5" r="2.5"/>
+                        <circle cx="18.5" cy="18.5" r="2.5"/>
                       </svg>
-                      <span>{{ t.tipo === 'DESCARGA' ? (t.companeros === 'Solo' ? 'Descarga:' : 'Descargó con:') : 'Cuadrilla:' }}</span>
-                    </span>
-                    <span class="font-bold text-slate-900">{{ t.companeros }}</span>
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-xs font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
+                          Embarque {{ grupo.numeroEmbarque }}
+                        </span>
+                        <span class="text-sm font-bold text-slate-900">
+                          {{ grupo.cantidad_trailers }} Tráiler(s) de Bloques
+                        </span>
+                      </div>
+                      <div class="text-[11px] text-slate-500 font-mono mt-0.5">
+                        {{ grupo.fecha }} @if (grupo.diaSemana) { <span class="capitalize font-semibold text-slate-600">({{ grupo.diaSemana }})</span> }
+                      </div>
+                      @if (grupo.observaciones) {
+                        <p class="text-xs text-slate-500 italic mt-1 font-medium">"{{ grupo.observaciones }}"</p>
+                      }
+                    </div>
                   </div>
-                }
-                <span class="text-slate-600 block text-[11px]">{{ t.detalle }}</span>
+                  <div class="text-right">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total Nómina</span>
+                    <span class="text-base font-black text-slate-900 font-mono">${{ grupo.total_pago | number:'1.2-2' }}</span>
+                  </div>
+                </div>
+
+                <!-- Cuadrilla: Los 4 cargadores de este embarque -->
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                      Cuadrilla ({{ grupo.turnos.length }} cargadores a $7.00 c/u):
+                    </span>
+                    @if (authService.esAdmin()) {
+                      <button (click)="pagarEmbarqueCompleto(grupo)"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer"
+                        [ngClass]="grupo.todosPagados ? 'bg-slate-100 text-slate-600' : 'bg-emerald-600 text-white shadow-xs'">
+                        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>{{ grupo.todosPagados ? 'Liquidado' : 'Liquidar Cuadrilla' }}</span>
+                      </button>
+                    }
+                  </div>
+
+                  <div class="grid grid-cols-1 gap-2">
+                    @for (t of grupo.turnos; track t.numero + t.trabajador) {
+                      <div class="flex items-center justify-between p-2.5 rounded-xl border text-xs"
+                        [ngClass]="t.pagado ? 'bg-emerald-50/40 border-emerald-200/80' : 'bg-slate-50 border-slate-200/80'">
+                        <div class="min-w-0 pr-2">
+                          <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="font-mono text-[10px] font-semibold text-slate-400">{{ t.numero }}</span>
+                            <span class="font-bold text-slate-900">{{ t.trabajador }}</span>
+                            <span class="font-mono text-[11px] font-bold text-slate-700">(${{ t.monto | number:'1.2-2' }})</span>
+                          </div>
+                          <span class="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                            [ngClass]="t.pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                            {{ t.estado }}
+                          </span>
+                        </div>
+                        <button (click)="togglePago(t)"
+                          class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all apple-btn-active min-h-[30px] shrink-0 cursor-pointer"
+                          [ngClass]="t.pagado ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'">
+                          @if (t.pagado) {
+                            <span>Desmarcar</span>
+                          } @else {
+                            <span>Pagar</span>
+                          }
+                        </button>
+                      </div>
+                    }
+                  </div>
+                </div>
               </div>
-              
-              <button (click)="togglePago(t)"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all apple-btn-active min-h-[32px] cursor-pointer"
-                [ngClass]="t.pagado ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'">
-                @if (t.pagado) {
-                  <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                  <span>Desmarcar</span>
-                } @else {
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>
-                  <span>{{ t.tipo === 'DESCARGA' ? 'Cobrar' : 'Pagar' }}</span>
-                }
-              </button>
-            </div>
+            } @empty {
+              <div class="py-14 px-4 text-center space-y-3">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
+                  <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect width="16" height="13" x="1" y="6" rx="2"/>
+                    <path d="M17 9h4l3 3v4h-7"/>
+                  </svg>
+                </div>
+                <p class="text-xs font-bold text-slate-800">No hay embarques registrados en el filtro actual</p>
+              </div>
+            }
           </div>
-        } @empty {
-          <div class="py-14 px-4 text-center space-y-3">
-            <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
-              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-              </svg>
+        } @else {
+          @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
+            <div class="p-4 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="font-mono text-xs font-semibold text-slate-500">{{ t.numero }}</span>
+                  <span class="text-xs font-bold text-slate-900">{{ t.trabajador }}</span>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+                  [ngClass]="!t.pagado ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'">
+                  {{ t.estado }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between text-xs">
+                <div>
+                  <span class="text-slate-700 font-mono font-bold">{{ t.fecha }}</span>
+                  @if (t.diaSemana) {
+                    <span class="text-[11px] text-slate-400 ml-1.5 font-medium capitalize">({{ t.diaSemana }})</span>
+                  }
+                </div>
+                <span class="font-bold text-sm text-slate-900 font-mono">${{ t.monto | number:'1.2-2' }}</span>
+              </div>
+
+              <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs gap-2">
+                <div class="space-y-1">
+                  @if (t.companeros) {
+                    <div class="flex items-center gap-1.5 text-[11px]">
+                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200/80 text-[10px]">
+                        <svg class="w-2.5 h-2.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        <span>{{ t.tipo === 'DESCARGA' ? (t.companeros === 'Solo' ? 'Descarga:' : 'Descargó con:') : 'Cuadrilla:' }}</span>
+                      </span>
+                      <span class="font-bold text-slate-900">{{ t.companeros }}</span>
+                    </div>
+                  }
+                  <span class="text-slate-600 block text-[11px]">{{ t.detalle }}</span>
+                </div>
+                
+                <button (click)="togglePago(t)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all apple-btn-active min-h-[32px] cursor-pointer"
+                  [ngClass]="t.pagado ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs'">
+                  @if (t.pagado) {
+                    <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    <span>Desmarcar</span>
+                  } @else {
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>
+                    <span>{{ t.tipo === 'DESCARGA' ? 'Cobrar' : 'Pagar' }}</span>
+                  }
+                </button>
+              </div>
             </div>
-            <p class="text-xs font-bold text-slate-800">
-              {{ authService.esUsuario() ? 'No tienes faenas registradas en tu historial' : 'No hay faenas registradas' }}
-            </p>
-            <p class="text-[11px] text-slate-400 max-w-xs mx-auto font-medium">
-              {{ authService.esUsuario() ? 'Como eres un usuario nuevo o sin faenas, tus registros aparecerán aquí una vez que participes en una descarga o embarque.' : 'No hay faenas que coincidan con los filtros seleccionados.' }}
-            </p>
-          </div>
+          } @empty {
+            <div class="py-14 px-4 text-center space-y-3">
+              <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
+                <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <p class="text-xs font-bold text-slate-800">
+                {{ authService.esUsuario() ? 'No tienes registros en tu historial' : 'No hay registros encontrados' }}
+              </p>
+              <p class="text-[11px] text-slate-400 max-w-xs mx-auto font-medium">
+                {{ authService.esUsuario() ? 'Como eres un usuario nuevo o sin registros, tus faenas aparecerán aquí una vez que participes en una descarga o embarque.' : 'No se encontraron registros que coincidan con los filtros seleccionados.' }}
+              </p>
+            </div>
+          }
         }
       </div>
 
@@ -474,12 +571,12 @@
         <table class="w-full text-left text-xs min-w-[760px]">
           <thead class="bg-slate-50/75 text-slate-500 uppercase font-bold text-[10px] tracking-wider border-b border-slate-200/80">
             <tr>
-              <th class="px-4 py-3"># Faena</th>
+              <th class="px-4 py-3">{{ filtroTipoOperacion() === 'EMBARQUE' ? '# Embarque' : (filtroTipoOperacion() === 'DESCARGA' ? '# Descarga' : '# Faena') }}</th>
               <th class="px-4 py-3">Fecha</th>
               <th class="px-4 py-3">Trabajador</th>
               <th class="px-4 py-3">Operación</th>
-              <th class="px-4 py-3">Detalle Faena</th>
-              <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Monto a Cobrar' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Monto a Pagar' : 'Monto Faena') }}</th>
+              <th class="px-4 py-3">{{ filtroTipoOperacion() === 'EMBARQUE' ? 'Detalle Embarque' : (filtroTipoOperacion() === 'DESCARGA' ? 'Detalle Descarga' : 'Detalle Faena') }}</th>
+              <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Monto a Cobrar' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Monto a Pagar' : 'Monto') }}</th>
               <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Cobrado' : (filtroTipoOperacion() === 'EMBARQUE' ? 'Pagado' : 'Pagado / Cobrado') }}</th>
               <th class="px-4 py-3 text-right">{{ filtroTipoOperacion() === 'DESCARGA' ? 'Por Cobrar' : 'Por Liquidar' }}</th>
               <th class="px-4 py-3 text-center">Estado</th>
@@ -487,101 +584,228 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-slate-700 font-medium">
-            @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
-              <tr class="hover:bg-slate-50/60 transition-colors">
-                <td class="px-4 py-3 font-mono font-semibold text-slate-500 whitespace-nowrap">
-                  {{ t.numero }}
-                </td>
-                <td class="px-4 py-3 whitespace-nowrap">
-                  <div class="font-mono text-[11px] font-semibold text-slate-800">{{ t.fecha }}</div>
-                  @if (t.diaSemana) {
-                    <div class="text-[10px] text-slate-400 capitalize font-medium">{{ t.diaSemana }}</div>
-                  }
-                </td>
-                <td class="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
-                  {{ t.trabajador }}
-                </td>
-                <td class="px-4 py-3 text-[11px] whitespace-nowrap">
-                  <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-semibold text-[10px]"
-                    [ngClass]="t.tipo === 'DESCARGA' ? 'bg-amber-50 text-amber-800 border border-amber-200/70' : 'bg-blue-50 text-blue-800 border border-blue-200/70'">
-                    @if (t.tipo === 'DESCARGA') {
-                      <svg class="w-3 h-3 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m20 12-8 8-8-8 8-8z"/></svg>
-                      <span>Bajada Madera</span>
-                    } @else {
-                      <svg class="w-3 h-3 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="13" x="1" y="6" rx="2"/><path d="M17 9h4l3 3v4h-7"/></svg>
-                      <span>Tráiler Boya</span>
-                    }
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-slate-600 text-xs max-w-sm">
-                  @if (t.companeros) {
-                    <div class="flex items-center gap-1.5 mb-1 text-[11px]">
-                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200/80 text-[10px] shrink-0">
-                        <svg class="w-3 h-3 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            @if (esModoAgrupadoEmbarques()) {
+              @for (grupo of embarquesAgrupados(); track grupo.operacionId) {
+                <!-- Separador / Cabecera de Embarque -->
+                <tr class="bg-slate-100/95 border-t-2 border-slate-300">
+                  <td colspan="10" class="px-4 py-3">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-blue-700 text-white font-black text-xs shadow-xs">
+                          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="16" height="13" x="1" y="6" rx="2"/>
+                            <path d="M17 9h4l3 3v4h-7"/>
+                            <circle cx="5.5" cy="18.5" r="2.5"/>
+                            <circle cx="18.5" cy="18.5" r="2.5"/>
+                          </svg>
+                          <span>Embarque {{ grupo.numeroEmbarque }}</span>
+                        </span>
+                        <span class="text-xs font-black text-slate-900">
+                          {{ grupo.cantidad_trailers }} Tráiler(s) de Bloques
+                        </span>
+                        <span class="text-xs text-slate-500 font-mono font-medium">
+                          • {{ grupo.fecha }} @if (grupo.diaSemana) { <span class="capitalize font-semibold text-slate-700">({{ grupo.diaSemana }})</span> }
+                        </span>
+                        @if (grupo.observaciones) {
+                          <span class="text-xs text-slate-500 italic max-w-sm truncate">
+                            — "{{ grupo.observaciones }}"
+                          </span>
+                        }
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <span class="text-[11px] font-semibold text-slate-500">
+                          Cuadrilla de {{ grupo.turnos.length }} cargadores ($7.00 c/u)
+                        </span>
+                        <span class="text-xs font-extrabold text-slate-900 font-mono bg-white px-3 py-1 rounded-xl border border-slate-200/90 shadow-2xs">
+                          Total Nómina: ${{ grupo.total_pago | number:'1.2-2' }}
+                        </span>
+                        @if (authService.esAdmin()) {
+                          <button (click)="pagarEmbarqueCompleto(grupo)"
+                            class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                            [ngClass]="grupo.todosPagados ? 'bg-slate-200/80 text-slate-600 hover:bg-slate-300' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            <span>{{ grupo.todosPagados ? 'Liquidado' : 'Liquidar Cuadrilla' }}</span>
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Los 4 cargadores de este embarque -->
+                @for (t of grupo.turnos; track t.numero + t.trabajador) {
+                  <tr class="hover:bg-blue-50/20 transition-colors border-l-4 border-l-blue-500">
+                    <td class="px-4 py-3 font-mono font-semibold text-slate-500 whitespace-nowrap pl-6">
+                      {{ t.numero }}
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap">
+                      <div class="font-mono text-[11px] font-semibold text-slate-800">{{ t.fecha }}</div>
+                      @if (t.diaSemana) {
+                        <div class="text-[10px] text-slate-400 capitalize font-medium">{{ t.diaSemana }}</div>
+                      }
+                    </td>
+                    <td class="px-4 py-3 font-bold text-slate-900 whitespace-nowrap">
+                      {{ t.trabajador }}
+                    </td>
+                    <td class="px-4 py-3 text-[11px] whitespace-nowrap">
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-semibold text-[10px] bg-blue-50 text-blue-800 border border-blue-200/70">
+                        <svg class="w-3 h-3 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="13" x="1" y="6" rx="2"/><path d="M17 9h4l3 3v4h-7"/></svg>
+                        <span>Cargador Tráiler</span>
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-600 text-xs max-w-sm">
+                      <div class="font-medium text-slate-700 text-xs">{{ t.detalle }}</div>
+                      @if (t.observaciones) {
+                        <span class="block text-[11px] text-slate-400 italic mt-0.5">"{{ t.observaciones }}"</span>
+                      }
+                    </td>
+                    <td class="px-4 py-3 text-right font-bold text-slate-900 whitespace-nowrap font-mono">
+                      ${{ t.monto | number:'1.2-2' }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {{ t.montoPagado > 0 ? '$' + (t.montoPagado | number:'1.2-2') : '—' }}
+                    </td>
+                    <td class="px-4 py-3 text-right font-mono font-bold whitespace-nowrap"
+                      [ngClass]="t.montoPendiente > 0 ? 'text-amber-600' : 'text-slate-400'">
+                      {{ t.montoPendiente > 0 ? '$' + (t.montoPendiente | number:'1.2-2') : '—' }}
+                    </td>
+                    <td class="px-4 py-3 text-center whitespace-nowrap">
+                      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+                        [ngClass]="!t.pagado ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'">
+                        {{ t.estado }}
+                      </span>
+                    </td>
+                    <td class="px-4 py-3 text-center whitespace-nowrap">
+                      <button (click)="togglePago(t)"
+                        class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all apple-btn-active min-h-[30px] cursor-pointer"
+                        [ngClass]="t.pagado ? 'border border-slate-200 bg-white hover:bg-slate-100 text-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'"
+                        [title]="t.pagado ? 'Desmarcar' : 'Marcar como pagado'">
+                        @if (t.pagado) {
+                          <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                          <span>Desmarcar</span>
+                        } @else {
+                          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>
+                          <span>Pagar</span>
+                        }
+                      </button>
+                    </td>
+                  </tr>
+                }
+              } @empty {
+                <tr>
+                  <td colspan="10" class="py-16 px-4 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                      <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                          <rect width="16" height="13" x="1" y="6" rx="2"/>
+                          <path d="M17 9h4l3 3v4h-7"/>
                         </svg>
-                        <span>{{ t.tipo === 'DESCARGA' ? (t.companeros === 'Solo' ? 'Modalidad:' : 'Descargó con:') : 'Cuadrilla:' }}</span>
-                      </span>
-                      <span class="font-bold text-slate-900">{{ t.companeros }}</span>
+                      </div>
+                      <div>
+                        <span class="font-bold text-slate-800 text-xs block">No hay embarques registrados</span>
+                        <span class="text-slate-400 text-[11px] max-w-sm mt-0.5 block">No se encontraron embarques que coincidan con los filtros seleccionados.</span>
+                      </div>
                     </div>
-                  }
-                  <div class="font-medium text-slate-600 text-xs">{{ t.detalle }}</div>
-                  @if (t.observaciones) {
-                    <span class="block text-[11px] text-slate-400 italic mt-0.5">"{{ t.observaciones }}"</span>
-                  }
-                </td>
-                <td class="px-4 py-3 text-right font-bold text-slate-900 whitespace-nowrap font-mono">
-                  ${{ t.monto | number:'1.2-2' }}
-                </td>
-                <td class="px-4 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                  {{ t.montoPagado > 0 ? '$' + (t.montoPagado | number:'1.2-2') : '—' }}
-                </td>
-                <td class="px-4 py-3 text-right font-mono font-bold whitespace-nowrap"
-                  [ngClass]="t.montoPendiente > 0 ? 'text-amber-600' : 'text-slate-400'">
-                  {{ t.montoPendiente > 0 ? '$' + (t.montoPendiente | number:'1.2-2') : '—' }}
-                </td>
-                <td class="px-4 py-3 text-center whitespace-nowrap">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
-                    [ngClass]="!t.pagado ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'">
-                    {{ t.estado }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-center whitespace-nowrap">
-                  <button (click)="togglePago(t)"
-                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all apple-btn-active min-h-[30px] cursor-pointer"
-                    [ngClass]="t.pagado ? 'border border-slate-200 bg-white hover:bg-slate-100 text-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'"
-                    [title]="t.pagado ? 'Desmarcar' : (t.tipo === 'DESCARGA' ? 'Marcar como cobrado' : 'Marcar como pagado')">
-                    @if (t.pagado) {
-                      <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                      <span>Desmarcar</span>
-                    } @else {
-                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>
-                      <span>{{ t.tipo === 'DESCARGA' ? 'Cobrar' : 'Pagar' }}</span>
+                  </td>
+                </tr>
+              }
+            } @else {
+              @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
+                <tr class="hover:bg-slate-50/60 transition-colors">
+                  <td class="px-4 py-3 font-mono font-semibold text-slate-500 whitespace-nowrap">
+                    {{ t.numero }}
+                  </td>
+                  <td class="px-4 py-3 whitespace-nowrap">
+                    <div class="font-mono text-[11px] font-semibold text-slate-800">{{ t.fecha }}</div>
+                    @if (t.diaSemana) {
+                      <div class="text-[10px] text-slate-400 capitalize font-medium">{{ t.diaSemana }}</div>
                     }
-                  </button>
-                </td>
-              </tr>
-            } @empty {
-              <tr>
-                <td colspan="10" class="py-16 px-4 text-center">
-                  <div class="flex flex-col items-center gap-3">
-                    <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
-                      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                      </svg>
+                  </td>
+                  <td class="px-4 py-3 font-semibold text-slate-900 whitespace-nowrap">
+                    {{ t.trabajador }}
+                  </td>
+                  <td class="px-4 py-3 text-[11px] whitespace-nowrap">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-semibold text-[10px]"
+                      [ngClass]="t.tipo === 'DESCARGA' ? 'bg-amber-50 text-amber-800 border border-amber-200/70' : 'bg-blue-50 text-blue-800 border border-blue-200/70'">
+                      @if (t.tipo === 'DESCARGA') {
+                        <svg class="w-3 h-3 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m20 12-8 8-8-8 8-8z"/></svg>
+                        <span>Bajada Madera</span>
+                      } @else {
+                        <svg class="w-3 h-3 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="13" x="1" y="6" rx="2"/><path d="M17 9h4l3 3v4h-7"/></svg>
+                        <span>Tráiler Boya</span>
+                      }
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-slate-600 text-xs max-w-sm">
+                    @if (t.companeros) {
+                      <div class="flex items-center gap-1.5 mb-1 text-[11px]">
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200/80 text-[10px] shrink-0">
+                          <svg class="w-3 h-3 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                          </svg>
+                          <span>{{ t.tipo === 'DESCARGA' ? (t.companeros === 'Solo' ? 'Modalidad:' : 'Descargó con:') : 'Cuadrilla:' }}</span>
+                        </span>
+                        <span class="font-bold text-slate-900">{{ t.companeros }}</span>
+                      </div>
+                    }
+                    <div class="font-medium text-slate-600 text-xs">{{ t.detalle }}</div>
+                    @if (t.observaciones) {
+                      <span class="block text-[11px] text-slate-400 italic mt-0.5">"{{ t.observaciones }}"</span>
+                    }
+                  </td>
+                  <td class="px-4 py-3 text-right font-bold text-slate-900 whitespace-nowrap font-mono">
+                    ${{ t.monto | number:'1.2-2' }}
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                    {{ t.montoPagado > 0 ? '$' + (t.montoPagado | number:'1.2-2') : '—' }}
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono font-bold whitespace-nowrap"
+                    [ngClass]="t.montoPendiente > 0 ? 'text-amber-600' : 'text-slate-400'">
+                    {{ t.montoPendiente > 0 ? '$' + (t.montoPendiente | number:'1.2-2') : '—' }}
+                  </td>
+                  <td class="px-4 py-3 text-center whitespace-nowrap">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+                      [ngClass]="!t.pagado ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'">
+                      {{ t.estado }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-center whitespace-nowrap">
+                    <button (click)="togglePago(t)"
+                      class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all apple-btn-active min-h-[30px] cursor-pointer"
+                      [ngClass]="t.pagado ? 'border border-slate-200 bg-white hover:bg-slate-100 text-slate-600' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'"
+                      [title]="t.pagado ? 'Desmarcar' : (t.tipo === 'DESCARGA' ? 'Marcar como cobrado' : 'Marcar como pagado')">
+                      @if (t.pagado) {
+                        <svg class="w-3.5 h-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        <span>Desmarcar</span>
+                      } @else {
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>
+                        <span>{{ t.tipo === 'DESCARGA' ? 'Cobrar' : 'Pagar' }}</span>
+                      }
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="10" class="py-16 px-4 text-center">
+                    <div class="flex flex-col items-center gap-3">
+                      <div class="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-center text-slate-400">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <span class="font-bold text-slate-800 text-xs block">
+                          {{ authService.esUsuario() ? 'No tienes registros en tu historial' : 'No hay registros encontrados' }}
+                        </span>
+                        <span class="text-slate-400 text-[11px] max-w-sm mt-0.5 block">
+                          {{ authService.esUsuario() ? 'Como eres un usuario nuevo o sin registros, tus faenas aparecerán aquí una vez que participes en una descarga o embarque.' : 'No se encontraron faenas que coincidan con los filtros seleccionados.' }}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span class="font-bold text-slate-800 text-xs block">
-                        {{ authService.esUsuario() ? 'No tienes faenas registradas en tu historial' : 'No hay faenas registradas' }}
-                      </span>
-                      <span class="text-slate-400 text-[11px] max-w-sm mt-0.5 block">
-                        {{ authService.esUsuario() ? 'Como eres un usuario nuevo o sin faenas, tus registros aparecerán aquí una vez que participes en una descarga o embarque.' : 'No se encontraron faenas que coincidan con los filtros seleccionados.' }}
-                      </span>
-                    </div>
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              }
             }
           </tbody>
         </table>
@@ -613,7 +837,7 @@
                 </div>
                 <div>
                   <span class="font-bold text-xs text-slate-900 block leading-tight">{{ res.nombre }}</span>
-                  <span class="text-[10px] text-slate-400 font-medium">{{ res.cantidad_faenas }} faena(s)</span>
+                  <span class="text-[10px] text-slate-400 font-medium">{{ res.cantidad_faenas }} {{ filtroTipoOperacion() === 'EMBARQUE' ? 'embarque(s)' : (filtroTipoOperacion() === 'DESCARGA' ? 'descarga(s)' : 'op.') }}</span>
                 </div>
               </div>
             </div>
@@ -680,8 +904,12 @@
     <!-- Resumen Financiero en Cajas -->
     <div class="grid grid-cols-4 gap-3 text-center">
       <div class="p-3 border border-slate-300 rounded-lg">
-        <span class="text-[9pt] uppercase font-bold text-slate-500 block">Jornadas / Faenas</span>
-        <span class="text-base font-black text-slate-900 block mt-0.5">{{ turnosFiltrados().length }}</span>
+        <span class="text-[9pt] uppercase font-bold text-slate-500 block">
+          {{ filtroTipoOperacion() === 'EMBARQUE' ? 'Total Embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Total Descargas' : 'Jornadas / Faenas') }}
+        </span>
+        <span class="text-base font-black text-slate-900 block mt-0.5">
+          {{ esModoAgrupadoEmbarques() ? embarquesAgrupados().length : turnosFiltrados().length }}
+        </span>
       </div>
       <div class="p-3 border border-slate-300 rounded-lg">
         <span class="text-[9pt] uppercase font-bold text-slate-500 block">Total Generado</span>
@@ -706,7 +934,7 @@
         <thead>
           <tr>
             <th class="text-left">TRABAJADOR</th>
-            <th class="text-center">FAENAS</th>
+            <th class="text-center">{{ filtroTipoOperacion() === 'EMBARQUE' ? 'EMBARQUES' : (filtroTipoOperacion() === 'DESCARGA' ? 'DESCARGAS' : 'FAENAS') }}</th>
             <th class="text-right">TOTAL GANADO</th>
             <th class="text-right">YA PAGADO</th>
             <th class="text-right">SALDO POR LIQUIDAR</th>
@@ -728,10 +956,10 @@
       </table>
     </div>
 
-    <!-- 2. Detalle de Faenas -->
+    <!-- 2. Detalle de Faenas / Embarques -->
     <div class="pt-2">
       <h3 class="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-300 pb-1 mb-2">
-        2. DETALLE DE MOVIMIENTOS Y FAENAS DE PATIO
+        {{ filtroTipoOperacion() === 'EMBARQUE' ? '2. DETALLE CRONOLÓGICO DE EMBARQUES DE TRÁILERS' : '2. DETALLE DE MOVIMIENTOS Y FAENAS DE PATIO' }}
       </h3>
       <table class="w-full text-xs">
         <thead>
@@ -748,18 +976,41 @@
           </tr>
         </thead>
         <tbody>
-          @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
-            <tr>
-              <td class="font-mono font-bold">{{ t.numero }}</td>
-              <td class="font-mono text-[8.5pt]">{{ t.fecha }}</td>
-              <td class="font-bold">{{ t.trabajador }}</td>
-              <td>{{ t.tipo === 'DESCARGA' ? 'Bajada Madera' : 'Tráiler Boya' }}</td>
-              <td>{{ t.detalle }}</td>
-              <td class="text-right font-mono">${{ t.monto | number:'1.2-2' }}</td>
-              <td class="text-right font-mono">${{ t.montoPagado | number:'1.2-2' }}</td>
-              <td class="text-right font-mono font-bold">${{ t.montoPendiente | number:'1.2-2' }}</td>
-              <td class="text-center font-bold text-[8pt]">{{ t.estado | uppercase }}</td>
-            </tr>
+          @if (esModoAgrupadoEmbarques()) {
+            @for (grupo of embarquesAgrupados(); track grupo.operacionId) {
+              <tr class="bg-slate-100 font-bold border-t border-b border-slate-400">
+                <td colspan="9" class="py-1 px-2">
+                  EMBARQUE {{ grupo.numeroEmbarque }}: {{ grupo.cantidad_trailers }} Tráiler(s) de Bloques • {{ grupo.fecha }} @if (grupo.diaSemana) { ({{ grupo.diaSemana }}) } • Total Nómina: ${{ grupo.total_pago | number:'1.2-2' }} @if (grupo.observaciones) { — "{{ grupo.observaciones }}" }
+                </td>
+              </tr>
+              @for (t of grupo.turnos; track t.numero + t.trabajador) {
+                <tr>
+                  <td class="font-mono font-bold">{{ t.numero }}</td>
+                  <td class="font-mono text-[8.5pt]">{{ t.fecha }}</td>
+                  <td class="font-bold">{{ t.trabajador }}</td>
+                  <td>Cargador Tráiler</td>
+                  <td>{{ t.detalle }}</td>
+                  <td class="text-right font-mono">${{ t.monto | number:'1.2-2' }}</td>
+                  <td class="text-right font-mono">${{ t.montoPagado | number:'1.2-2' }}</td>
+                  <td class="text-right font-mono font-bold">${{ t.montoPendiente | number:'1.2-2' }}</td>
+                  <td class="text-center font-bold text-[8pt]">{{ t.estado | uppercase }}</td>
+                </tr>
+              }
+            }
+          } @else {
+            @for (t of turnosFiltrados(); track t.numero + t.trabajador + t.fecha) {
+              <tr>
+                <td class="font-mono font-bold">{{ t.numero }}</td>
+                <td class="font-mono text-[8.5pt]">{{ t.fecha }}</td>
+                <td class="font-bold">{{ t.trabajador }}</td>
+                <td>{{ t.tipo === 'DESCARGA' ? 'Bajada Madera' : 'Tráiler Boya' }}</td>
+                <td>{{ t.detalle }}</td>
+                <td class="text-right font-mono">${{ t.monto | number:'1.2-2' }}</td>
+                <td class="text-right font-mono">${{ t.montoPagado | number:'1.2-2' }}</td>
+                <td class="text-right font-mono font-bold">${{ t.montoPendiente | number:'1.2-2' }}</td>
+                <td class="text-center font-bold text-[8pt]">{{ t.estado | uppercase }}</td>
+              </tr>
+            }
           }
         </tbody>
       </table>
