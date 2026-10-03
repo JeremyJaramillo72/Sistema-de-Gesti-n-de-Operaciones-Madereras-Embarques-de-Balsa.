@@ -13,6 +13,7 @@ export interface FaenaAuditoria {
   trabajador: string;
   trabajadorId: string;
   fecha: string;
+  diaSemana: string;
   tipo: 'DESCARGA' | 'EMBARQUE';
   detalle: string;
   companeros?: string;
@@ -93,6 +94,18 @@ export class ReportesComponent {
     if (val) this.filtroPeriodo.set('todo');
   }
 
+  obtenerDiaSemana(fechaStr: string): string {
+    if (!fechaStr) return '';
+    const partes = fechaStr.split('-');
+    if (partes.length !== 3) return '';
+    const y = parseInt(partes[0], 10);
+    const m = parseInt(partes[1], 10) - 1;
+    const d = parseInt(partes[2], 10);
+    const fecha = new Date(y, m, d, 12, 0, 0);
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    return dias[fecha.getDay()] || '';
+  }
+
   cambiarPeriodo(periodo: 'hoy' | '7dias' | 'mes' | 'semana_abril' | 'todo') {
     this.filtroPeriodo.set(periodo);
     const hoy = new Date();
@@ -151,11 +164,14 @@ export class ReportesComponent {
 
         const companerosStr = otros.length > 0 ? otros.join(', ') : 'Solo';
 
+        const diaSemana = this.obtenerDiaSemana(d.fecha);
+
         lista.push({
           numero: numRegistro,
           trabajador: t.trabajador_nombre || 'Trabajador',
           trabajadorId: t.trabajador_id,
           fecha: d.fecha,
+          diaSemana,
           tipo: 'DESCARGA',
           detalle: `${d.cantidad_carros} Carro(s) • ${d.filas_por_carro} filas ($${d.total_pago.toFixed(2)} total ÷ ${cantPers} pers.)`,
           companeros: companerosStr,
@@ -181,12 +197,14 @@ export class ReportesComponent {
           .map(otro => otro.trabajador_nombre || 'Trabajador');
 
         const companerosEmb = otrosEmb.length > 0 ? otrosEmb.join(', ') : 'Solo';
+        const diaSemanaEmb = this.obtenerDiaSemana(e.fecha);
 
         lista.push({
           numero: numRegistro,
           trabajador: t.trabajador_nombre || 'Trabajador',
           trabajadorId: t.trabajador_id,
           fecha: e.fecha,
+          diaSemana: diaSemanaEmb,
           tipo: 'EMBARQUE',
           detalle: `${e.cantidad_trailers} Tráiler(s) de Bloques ($7.00/pers)`,
           companeros: companerosEmb,
@@ -517,20 +535,30 @@ export class ReportesComponent {
       currentY += 3;
 
       const filasDetalle = faenas.map(f => {
-        let detalleTexto = f.detalle;
-        if (f.companeros && f.companeros !== 'Solo') {
-          detalleTexto += f.tipo === 'DESCARGA' 
-            ? `\nDescargó con: ${f.companeros}` 
-            : `\nCuadrilla: ${f.companeros}`;
-        } else if (f.companeros === 'Solo' && f.tipo === 'DESCARGA') {
-          detalleTexto += '\nDescarga individual (Solo)';
+        let detalleTexto = '';
+        if (f.tipo === 'DESCARGA') {
+          if (f.companeros && f.companeros !== 'Solo') {
+            detalleTexto = `Descargó con: ${f.companeros}\n${f.detalle}`;
+          } else {
+            detalleTexto = `Descarga individual (Solo)\n${f.detalle}`;
+          }
+        } else {
+          if (f.companeros && f.companeros !== 'Solo') {
+            detalleTexto = `Cuadrilla: ${f.companeros}\n${f.detalle}`;
+          } else {
+            detalleTexto = f.detalle;
+          }
         }
+
         if (f.observaciones) {
           detalleTexto += `\n"${f.observaciones}"`;
         }
+
+        const fechaTexto = f.diaSemana ? `${f.fecha}\n${f.diaSemana}` : f.fecha;
+
         return [
           f.numero,
-          f.fecha,
+          fechaTexto,
           f.trabajador,
           f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
           detalleTexto,
@@ -557,12 +585,12 @@ export class ReportesComponent {
           textColor: [30, 41, 59]
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 14 },
-          1: { halign: 'center', cellWidth: 20 },
-          2: { halign: 'left', cellWidth: 32, fontStyle: 'bold' },
-          3: { halign: 'center', cellWidth: 26 },
+          0: { halign: 'center', cellWidth: 12 },
+          1: { halign: 'center', cellWidth: 22 },
+          2: { halign: 'left', cellWidth: 30, fontStyle: 'bold' },
+          3: { halign: 'center', cellWidth: 24 },
           4: { halign: 'left' },
-          5: { halign: 'right', cellWidth: 20, fontStyle: 'bold' },
+          5: { halign: 'right', cellWidth: 18, fontStyle: 'bold' },
           6: { halign: 'center', cellWidth: 22 }
         },
         alternateRowStyles: {
@@ -630,9 +658,10 @@ export class ReportesComponent {
       '# Registro': t.numero,
       Trabajador: t.trabajador,
       Fecha: t.fecha,
+      'Día': t.diaSemana,
       Operacion: t.tipo === 'DESCARGA' ? 'Bajada de Madera' : 'Embarque de Tráiler',
+      'Descargó con / Cuadrilla': t.companeros || 'Solo',
       Detalle: t.detalle,
-      'Acompañantes / Cuadrilla': t.companeros || 'Solo',
       'Monto Jornal / A Cobrar ($)': t.monto,
       'Monto Pagado / Cobrado ($)': t.montoPagado,
       'Saldo Pendiente ($)': t.montoPendiente,
