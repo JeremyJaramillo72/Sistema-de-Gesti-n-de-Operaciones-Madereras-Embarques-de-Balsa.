@@ -1,0 +1,755 @@
+<div class="w-full space-y-6">
+
+  <!-- Toast de Éxito Flotante -->
+  @if (mensajeExito()) {
+    <div class="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 text-xs font-bold no-print animate-fade-in">
+      <svg class="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>{{ mensajeExito() }}</span>
+    </div>
+  }
+
+  <!-- MODAL DE CONFIRMACIÓN DE ELIMINACIÓN CON DISEÑO APPLE -->
+  @if (modalEliminarAbierto()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm no-print">
+      <div class="bg-white rounded-3xl shadow-2xl border border-slate-200/80 max-w-md w-full p-6 space-y-4">
+        
+        <div class="flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-red-50 border border-red-200/60 text-red-600 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-black text-slate-900">
+              ¿Eliminar Registro de Horas?
+            </h3>
+            <p class="text-xs text-slate-500 font-medium">
+              Esta acción eliminará el turno laborado y recalculará la nómina.
+            </p>
+          </div>
+        </div>
+
+        <!-- Detalles del registro -->
+        @if (itemAEliminar()) {
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs space-y-2">
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-medium">Fecha:</span>
+              <span class="font-bold text-slate-900 font-mono">{{ itemAEliminar()?.fecha }} ({{ obtenerDiaSemana(itemAEliminar()?.fecha || '') }})</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-medium">Trabajador:</span>
+              <span class="font-bold text-slate-900">{{ itemAEliminar()?.trabajador_nombre }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-medium">Horas / Tarifa:</span>
+              <span class="font-bold text-slate-900">{{ itemAEliminar()?.horas }} hrs @ ${{ itemAEliminar()?.tarifa_por_hora | number:'1.2-2' }}/h</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-500 font-medium">Actividad:</span>
+              <span class="font-medium text-slate-700">{{ itemAEliminar()?.actividad || 'Jornal General' }}</span>
+            </div>
+            <div class="flex justify-between pt-2 border-t border-slate-200/60">
+              <span class="text-slate-600 font-bold">Total Pago:</span>
+              <span class="font-bold text-sm text-red-600 font-mono">${{ itemAEliminar()?.total_pago | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        }
+
+        <p class="text-[11px] text-slate-400">
+          Al confirmar, los saldos adeudados y acumulados se actualizarán inmediatamente.
+        </p>
+
+        <div class="flex items-center justify-end gap-2.5 pt-2">
+          <button type="button" (click)="cerrarModalEliminar()" [disabled]="guardando()"
+            class="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-all apple-btn-active min-h-[38px] cursor-pointer">
+            Cancelar
+          </button>
+          <button type="button" (click)="ejecutarEliminar()" [disabled]="guardando()"
+            class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all apple-btn-active min-h-[38px] cursor-pointer flex items-center gap-1.5">
+            @if (guardando()) {
+              <svg class="w-3.5 h-3.5 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>Eliminando...</span>
+            } @else {
+              <span>Sí, Eliminar</span>
+            }
+          </button>
+        </div>
+
+      </div>
+    </div>
+  }
+
+  <!-- ENCABEZADO EJECUTIVO -->
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+          {{ authService.esAdmin() ? 'CONTROL DE PATIO • REGISTRO DE HORAS' : 'MIS HORAS TRABAJADAS' }}
+        </span>
+      </div>
+      <h1 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+        {{ authService.esAdmin() ? 'Horas Trabajadas • Jornales y Horas Extras' : 'Mis Horas Trabajadas • Jornales' }}
+      </h1>
+      <p class="text-xs sm:text-sm text-slate-500 mt-0.5 font-medium">
+        Registro y control de horas laboradas. Tarifa base por defecto: <span class="font-bold text-slate-700 font-mono">$2.50 / hora</span>.
+      </p>
+    </div>
+
+    <button (click)="abrirFormularioNuevo()"
+      class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all apple-btn-active min-h-[42px] cursor-pointer shadow-xs"
+      [ngClass]="mostrarFormulario() && !modoEdicion() ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300' : 'bg-slate-900 hover:bg-slate-800 text-white'">
+      @if (mostrarFormulario() && !modoEdicion()) {
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <span>Cerrar Formulario</span>
+      } @else {
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <span>+ Registrar Horas</span>
+      }
+    </button>
+  </div>
+
+  <!-- TARJETAS DE MÉTRICAS (KPIs ESTILO APPLE) -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    
+    <!-- Total Horas -->
+    <div class="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Horas</span>
+        <div class="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span class="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
+          {{ totalHorasFiltradas() | number:'1.1-2' }}
+        </span>
+        <span class="text-xs font-semibold text-slate-400 ml-1">hrs</span>
+        <p class="text-[11px] text-slate-400 mt-0.5">En el período visible</p>
+      </div>
+    </div>
+
+    <!-- Saldo Pendiente (Por Cobrar / Liquidar) -->
+    <div class="p-4 rounded-2xl bg-white border border-amber-200/80 shadow-xs flex flex-col justify-between">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">
+          {{ authService.esAdmin() ? 'Por Liquidar' : 'Por Cobrar' }}
+        </span>
+        <div class="w-7 h-7 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span class="text-2xl sm:text-3xl font-black text-amber-600 font-mono tracking-tight">
+          ${{ totalPendienteFiltrado() | number:'1.2-2' }}
+        </span>
+        <p class="text-[11px] text-amber-600/80 mt-0.5 font-medium">Pendiente de cobro</p>
+      </div>
+    </div>
+
+    <!-- Pagado / Cobrado -->
+    <div class="p-4 rounded-2xl bg-white border border-emerald-200/80 shadow-xs flex flex-col justify-between">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+          {{ authService.esAdmin() ? 'Total Pagado' : 'Ya Cobrado' }}
+        </span>
+        <div class="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span class="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-tight">
+          ${{ totalPagadoFiltrado() | number:'1.2-2' }}
+        </span>
+        <p class="text-[11px] text-emerald-600/80 mt-0.5 font-medium">Liquidado en cuenta</p>
+      </div>
+    </div>
+
+    <!-- Total Generado -->
+    <div class="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between">
+      <div class="flex items-center justify-between">
+        <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Nómina Horas</span>
+        <div class="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="mt-3">
+        <span class="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight">
+          ${{ totalGeneradoFiltrado() | number:'1.2-2' }}
+        </span>
+        <p class="text-[11px] text-slate-400 mt-0.5">
+          {{ horasFiltradas().length }} turnos registrados
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- FORMULARIO DE REGISTRO / EDICIÓN (COLLAPSIBLE APPLE HIG) -->
+  @if (mostrarFormulario()) {
+    <div class="p-5 sm:p-6 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-6 animate-fade-in">
+      
+      <!-- Encabezado del Formulario -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">
+              {{ modoEdicion() ? 'Modificar Registro de Horas' : 'Registrar Turno de Horas Trabajadas' }}
+            </h2>
+            <p class="text-xs text-slate-500">
+              Ingresa la fecha, el personal asignado, las horas laboradas y la tarifa ($2.50/h por defecto).
+            </p>
+          </div>
+        </div>
+
+        @if (modoEdicion()) {
+          <span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+            Modo Edición
+          </span>
+        }
+      </div>
+
+      <!-- Fila 1: Fecha & Tarifa por Hora -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        
+        <!-- Fecha -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            Fecha del Turno <span class="text-red-500">*</span>
+          </label>
+          <div class="flex gap-2">
+            <input type="date" [(ngModel)]="fecha"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-semibold text-slate-800 transition-all outline-hidden min-h-[42px]" />
+          </div>
+          @if (fecha) {
+            <p class="text-[11px] text-amber-600 font-semibold mt-1">
+              {{ obtenerDiaSemana(fecha) }}
+            </p>
+          }
+        </div>
+
+        <!-- Horas Trabajadas -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            Cantidad de Horas <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <input type="number" [(ngModel)]="horas" min="0.5" max="24" step="0.5"
+              class="w-full px-3 py-2 pr-12 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm font-bold text-slate-900 transition-all outline-hidden min-h-[42px]" />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+              hrs
+            </span>
+          </div>
+          <!-- Chips de horas rápidas -->
+          <div class="flex flex-wrap gap-1.5 mt-2">
+            @for (item of horasSugeridas; track item.horas) {
+              <button type="button" (click)="establecerHoras(item.horas)"
+                class="px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                [ngClass]="horas === item.horas ? 'bg-amber-500 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+                {{ item.horas }}h
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Tarifa por Hora (Por defecto $2.50) -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-slate-700">
+              Tarifa por Hora <span class="text-red-500">*</span>
+            </label>
+            @if (tarifaPorHora !== 2.50) {
+              <button type="button" (click)="restablecerTarifa()"
+                class="text-[10px] font-bold text-amber-600 hover:underline cursor-pointer">
+                Restablecer $2.50
+              </button>
+            }
+          </div>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">$</span>
+            <input type="number" [(ngModel)]="tarifaPorHora" min="0.5" step="0.25"
+              class="w-full pl-7 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-sm font-bold text-slate-900 transition-all outline-hidden min-h-[42px]" />
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1">
+            Tarifa estándar: <span class="font-bold text-slate-600 font-mono">$2.50/h</span> (modificable si aplica tarifa especial).
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Fila 2: Selección de Trabajador(es) -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-xs font-bold text-slate-700">
+            {{ modoEdicion() ? 'Trabajador Asignado' : 'Personal / Trabajadores que laboraron' }} <span class="text-red-500">*</span>
+          </label>
+
+          @if (!modoEdicion()) {
+            <div class="flex items-center gap-2">
+              <button type="button" (click)="seleccionarTodosTrabajadores()"
+                class="text-[11px] font-bold text-amber-600 hover:text-amber-700 cursor-pointer">
+                Seleccionar todos
+              </button>
+              <span class="text-slate-300">•</span>
+              <button type="button" (click)="limpiarSeleccionTrabajadores()"
+                class="text-[11px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer">
+                Limpiar
+              </button>
+            </div>
+          }
+        </div>
+
+        @if (modoEdicion()) {
+          <!-- Dropdown individual para edición -->
+          <select [(ngModel)]="trabajadorIdEdicion"
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-semibold text-slate-800 transition-all outline-hidden min-h-[42px]">
+            @for (t of dataService.trabajadoresParaFaena(); track t.id) {
+              <option [value]="t.id">{{ t.nombre }} {{ t.alias ? '(' + t.alias + ')' : '' }}</option>
+            }
+          </select>
+        } @else {
+          <!-- Grid de chips de trabajadores seleccionables (multiselección amigable) -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
+            @for (t of dataService.trabajadoresParaFaena(); track t.id) {
+              <button type="button" (click)="toggleTrabajador(t.id)"
+                class="p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer apple-btn-active"
+                [ngClass]="estaSeleccionado(t.id) 
+                  ? 'bg-amber-500/10 border-amber-500 text-slate-900 shadow-xs' 
+                  : 'bg-slate-50 border-slate-200/80 text-slate-600 hover:bg-slate-100'">
+                <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors"
+                  [ngClass]="estaSeleccionado(t.id) ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-600'">
+                  {{ (t.alias || t.nombre).charAt(0).toUpperCase() }}
+                </div>
+                <div class="truncate leading-tight">
+                  <p class="text-xs font-bold truncate">{{ t.alias || t.nombre }}</p>
+                  <p class="text-[10px] text-slate-400 truncate">{{ t.nombre }}</p>
+                </div>
+              </button>
+            }
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2">
+            Seleccionados: <span class="font-bold text-amber-600">{{ seleccionadosIds().length }}</span> trabajador(es). Se creará un turno individual para cada uno.
+          </p>
+        }
+      </div>
+
+      <!-- Fila 3: Actividad / Labor & Observaciones -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        
+        <!-- Actividad / Tarea realizada -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            Actividad / Tarea Realizada
+          </label>
+          <input type="text" [(ngModel)]="actividad" placeholder="Ej: Jornal General, Corte, Limpieza..."
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-semibold text-slate-800 transition-all outline-hidden min-h-[42px]" />
+          
+          <!-- Chips de actividades sugeridas -->
+          <div class="flex flex-wrap gap-1.5 mt-2">
+            @for (act of actividadesSugeridas; track act) {
+              <button type="button" (click)="establecerActividad(act)"
+                class="px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer"
+                [ngClass]="actividad === act ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+                {{ act }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Observaciones -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">
+            Observaciones / Notas (Opcional)
+          </label>
+          <input type="text" [(ngModel)]="observaciones" placeholder="Ej: Turno de tarde, horas de apoyo en patio..."
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-xs font-semibold text-slate-800 transition-all outline-hidden min-h-[42px]" />
+          <p class="text-[11px] text-slate-400 mt-1">Cualquier detalle relevante sobre el trabajo realizado.</p>
+        </div>
+
+      </div>
+
+      <!-- Resumen Dinámico del Cálculo (Callout Estilo Apple HIG) -->
+      <div class="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-xs shrink-0">
+            $
+          </div>
+          <div class="text-xs">
+            <span class="font-bold text-slate-900">
+              {{ horas || 0 }} hrs × ${{ tarifaPorHora | number:'1.2-2' }}/h = 
+              <span class="text-amber-700 font-mono font-bold">${{ montoPorPersonaCalculado() | number:'1.2-2' }}</span> por trabajador
+            </span>
+            <p class="text-slate-500 text-[11px]">
+              {{ modoEdicion() ? '1 trabajador en edición' : (seleccionadosIds().length + ' trabajador(es) seleccionado(s)') }}
+            </p>
+          </div>
+        </div>
+
+        <div class="text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-amber-200/50">
+          <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Nómina</span>
+          <p class="text-xl font-black text-amber-600 font-mono">
+            ${{ totalCalculado() | number:'1.2-2' }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" (click)="cancelarEdicion()" [disabled]="guardando()"
+          class="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold text-xs transition-all apple-btn-active min-h-[40px] cursor-pointer">
+          Cancelar
+        </button>
+
+        <button type="button" (click)="guardarHoras()" [disabled]="guardando() || (!modoEdicion() && seleccionadosIds().length === 0)"
+          class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs shadow-xs transition-all apple-btn-active min-h-[40px] cursor-pointer flex items-center gap-2">
+          @if (guardando()) {
+            <svg class="w-4 h-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>Guardando...</span>
+          } @else {
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>{{ modoEdicion() ? 'Actualizar Horas' : 'Guardar Horas' }}</span>
+          }
+        </button>
+      </div>
+
+    </div>
+  }
+
+  <!-- BARRA DE FILTROS & HERRAMIENTAS (ESTILO SEGMENTADO APPLE) -->
+  <div class="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-xs space-y-3">
+    
+    <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+      
+      <!-- Búsqueda en Vivo -->
+      <div class="relative flex-1">
+        <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" [ngModel]="filtroTexto()" (ngModelChange)="filtroTexto.set($event)"
+          placeholder="Buscar por trabajador, actividad u observaciones..."
+          class="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-slate-400 text-xs font-medium text-slate-800 transition-all outline-hidden min-h-[38px]" />
+        @if (filtroTexto()) {
+          <button type="button" (click)="filtroTexto.set('')"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+            ✕
+          </button>
+        }
+      </div>
+
+      <!-- Filtro por Trabajador -->
+      <div class="w-full sm:w-56 shrink-0">
+        <select [ngModel]="trabajadorFiltro()" (ngModelChange)="trabajadorFiltro.set($event)"
+          class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white text-xs font-semibold text-slate-800 transition-all outline-hidden min-h-[38px]">
+          <option value="">Todos los trabajadores</option>
+          @for (t of dataService.trabajadoresParaFaena(); track t.id) {
+            <option [value]="t.id">{{ t.nombre }} {{ t.alias ? '(' + t.alias + ')' : '' }}</option>
+          }
+        </select>
+      </div>
+
+      <!-- Segmented Control de Estado (Todos / Pendientes / Pagados) -->
+      <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/60 shrink-0">
+        <button type="button" (click)="filtroEstado.set('todos')"
+          class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          [ngClass]="filtroEstado() === 'todos' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+          Todos
+        </button>
+        <button type="button" (click)="filtroEstado.set('pendientes')"
+          class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          [ngClass]="filtroEstado() === 'pendientes' ? 'bg-white text-amber-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+          {{ authService.esAdmin() ? 'Por Liquidar' : 'Por Cobrar' }}
+        </button>
+        <button type="button" (click)="filtroEstado.set('pagados')"
+          class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer"
+          [ngClass]="filtroEstado() === 'pagados' ? 'bg-white text-emerald-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'">
+          {{ authService.esAdmin() ? 'Pagados' : 'Cobrados' }}
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Fila 2 de Filtros: Rango de Fechas & Acciones Rápidas -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+      
+      <!-- Selector de Fechas y Presets Rápidos -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+          <span>Desde:</span>
+          <input type="date" [ngModel]="fechaDesde()" (ngModelChange)="fechaDesde.set($event)"
+            class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800" />
+        </div>
+        <div class="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+          <span>Hasta:</span>
+          <input type="date" [ngModel]="fechaHasta()" (ngModelChange)="fechaHasta.set($event)"
+            class="px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800" />
+        </div>
+
+        <!-- Presets -->
+        <div class="flex items-center gap-1">
+          <button type="button" (click)="establecerPeriodo('hoy')"
+            class="px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+            [ngClass]="filtroPeriodo() === 'hoy' ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+            Hoy
+          </button>
+          <button type="button" (click)="establecerPeriodo('7dias')"
+            class="px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+            [ngClass]="filtroPeriodo() === '7dias' ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+            7 Días
+          </button>
+          <button type="button" (click)="establecerPeriodo('mes')"
+            class="px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+            [ngClass]="filtroPeriodo() === 'mes' ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+            Mes
+          </button>
+          <button type="button" (click)="establecerPeriodo('todo')"
+            class="px-2 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer"
+            [ngClass]="filtroPeriodo() === 'todo' ? 'bg-slate-900 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'">
+            Todo
+          </button>
+        </div>
+      </div>
+
+      <!-- Acciones: Exportar CSV & Liquidar Visible -->
+      <div class="flex items-center gap-2 justify-end">
+        @if (authService.esAdmin() && totalPendienteFiltrado() > 0) {
+          <button type="button" (click)="marcarVisiblesPagadas()" [disabled]="guardando()"
+            class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all apple-btn-active cursor-pointer flex items-center gap-1.5 shadow-xs">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Liquidar Pendientes</span>
+          </button>
+        }
+
+        <button type="button" (click)="exportarCSV()"
+          class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all apple-btn-active cursor-pointer flex items-center gap-1.5 shadow-2xs">
+          <svg class="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Excel / CSV</span>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- TABLA DESKTOP & LISTA MOBILE -->
+  <div class="rounded-3xl bg-white border border-slate-200/90 shadow-xs overflow-hidden">
+    
+    @if (horasFiltradas().length === 0) {
+      <!-- Empty State -->
+      <div class="p-12 text-center space-y-3">
+        <div class="w-14 h-14 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mx-auto">
+          <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+        </div>
+        <h3 class="text-base font-bold text-slate-800">No hay registros de horas</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
+          No se encontraron turnos con los filtros actuales. Puedes registrar un nuevo turno o ajustar los filtros de fecha.
+        </p>
+        <button type="button" (click)="abrirFormularioNuevo()"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs transition-all apple-btn-active cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          <span>Registrar Primer Turno</span>
+        </button>
+      </div>
+    } @else {
+
+      <!-- TABLA PARA PANTALLAS MEDIANAS Y GRANDES -->
+      <div class="hidden md:block overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-50/80 border-b border-slate-200/80 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <th class="py-3 px-4">Fecha & Día</th>
+              <th class="py-3 px-4">Trabajador</th>
+              <th class="py-3 px-4">Actividad Realizada</th>
+              <th class="py-3 px-4 text-center">Horas</th>
+              <th class="py-3 px-4 text-right">Tarifa</th>
+              <th class="py-3 px-4 text-right">Total Pago</th>
+              <th class="py-3 px-4 text-center">Estado</th>
+              <th class="py-3 px-4 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-xs">
+            @for (h of horasFiltradas(); track h.id) {
+              <tr class="hover:bg-slate-50/70 transition-colors">
+                
+                <!-- Fecha & Día -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <div class="font-bold text-slate-900 font-mono">{{ h.fecha }}</div>
+                  <div class="text-[10px] text-slate-400 font-medium">{{ obtenerDiaSemana(h.fecha) }}</div>
+                </td>
+
+                <!-- Trabajador -->
+                <td class="py-3 px-4 whitespace-nowrap">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      {{ (h.trabajador_nombre || 'T').charAt(0).toUpperCase() }}
+                    </div>
+                    <div>
+                      <span class="font-bold text-slate-900">{{ h.trabajador_nombre }}</span>
+                      @if (h.usuario_creador && authService.esAdmin()) {
+                        <p class="text-[10px] text-slate-400">Por: {{ h.usuario_creador }}</p>
+                      }
+                    </div>
+                  </div>
+                </td>
+
+                <!-- Actividad -->
+                <td class="py-3 px-4">
+                  <span class="font-semibold text-slate-800">{{ h.actividad || 'Jornal General' }}</span>
+                  @if (h.observaciones) {
+                    <p class="text-[11px] text-slate-400 truncate max-w-xs">{{ h.observaciones }}</p>
+                  }
+                </td>
+
+                <!-- Horas -->
+                <td class="py-3 px-4 text-center whitespace-nowrap">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-bold font-mono bg-amber-50 text-amber-800 border border-amber-200/60">
+                    {{ h.horas }} hrs
+                  </span>
+                </td>
+
+                <!-- Tarifa -->
+                <td class="py-3 px-4 text-right whitespace-nowrap font-mono text-slate-600">
+                  ${{ h.tarifa_por_hora | number:'1.2-2' }}/h
+                </td>
+
+                <!-- Total Pago -->
+                <td class="py-3 px-4 text-right whitespace-nowrap font-mono font-bold text-sm text-slate-900">
+                  ${{ h.total_pago | number:'1.2-2' }}
+                </td>
+
+                <!-- Estado & Toggle de Pago -->
+                <td class="py-3 px-4 text-center whitespace-nowrap">
+                  <button type="button" (click)="togglePago(h)" [disabled]="guardando()"
+                    class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all cursor-pointer apple-btn-active border"
+                    [ngClass]="h.pagado 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                      : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'">
+                    @if (h.pagado) {
+                      <svg class="w-3 h-3 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                      <span>{{ authService.esAdmin() ? 'Pagado' : 'Cobrado' }}</span>
+                    } @else {
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      <span>{{ authService.esAdmin() ? 'Por Liquidar' : 'Por Cobrar' }}</span>
+                    }
+                  </button>
+                </td>
+
+                <!-- Acciones (Editar, Eliminar) -->
+                <td class="py-3 px-4 text-right whitespace-nowrap">
+                  <div class="flex items-center justify-end gap-1">
+                    @if (puedeModificar(h)) {
+                      <button type="button" (click)="iniciarEdicion(h)" title="Editar turno"
+                        class="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      </button>
+                      <button type="button" (click)="abrirModalEliminar(h)" title="Eliminar registro"
+                        class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    }
+                  </div>
+                </td>
+
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <!-- LISTA DE TARJETAS PARA CELULARES (MOBILE TOUCH OPTIMIZED) -->
+      <div class="md:hidden divide-y divide-slate-100">
+        @for (h of horasFiltradas(); track h.id) {
+          <div class="p-4 space-y-2.5">
+            
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-900 font-mono">{{ h.fecha }}</span>
+                <span class="text-[10px] text-slate-400 font-semibold">• {{ obtenerDiaSemana(h.fecha) }}</span>
+              </div>
+              <button type="button" (click)="togglePago(h)" [disabled]="guardando()"
+                class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition-all cursor-pointer"
+                [ngClass]="h.pagado 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                  : 'bg-amber-50 text-amber-700 border-amber-200'">
+                @if (h.pagado) {
+                  <span>✓ {{ authService.esAdmin() ? 'Pagado' : 'Cobrado' }}</span>
+                } @else {
+                  <span>• {{ authService.esAdmin() ? 'Por Liquidar' : 'Por Cobrar' }}</span>
+                }
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-700 flex items-center justify-center font-bold text-xs">
+                  {{ (h.trabajador_nombre || 'T').charAt(0).toUpperCase() }}
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-900">{{ h.trabajador_nombre }}</h4>
+                  <p class="text-[11px] text-slate-500">{{ h.actividad || 'Jornal General' }}</p>
+                </div>
+              </div>
+
+              <div class="text-right">
+                <p class="text-sm font-black text-slate-900 font-mono">${{ h.total_pago | number:'1.2-2' }}</p>
+                <p class="text-[10px] text-slate-400 font-mono">{{ h.horas }} hrs @ ${{ h.tarifa_por_hora | number:'1.2-2' }}/h</p>
+              </div>
+            </div>
+
+            @if (h.observaciones) {
+              <p class="text-[11px] text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100">
+                {{ h.observaciones }}
+              </p>
+            }
+
+            @if (puedeModificar(h)) {
+              <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                <button type="button" (click)="iniciarEdicion(h)"
+                  class="px-2.5 py-1 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50 cursor-pointer">
+                  Editar
+                </button>
+                <button type="button" (click)="abrirModalEliminar(h)"
+                  class="px-2.5 py-1 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 cursor-pointer">
+                  Eliminar
+                </button>
+              </div>
+            }
+
+          </div>
+        }
+      </div>
+
+    }
+
+  </div>
+
+</div>

@@ -26,8 +26,12 @@ export class SidebarComponent {
     return this.dataService.misEmbarques().reduce((acc, e) => acc + Number(e.cantidad_trailers || 0), 0);
   });
 
+  horasCount = computed(() => {
+    return this.dataService.misHorasTrabajadas().length;
+  });
+
   auditoriaCount = computed(() => {
-    return this.dataService.misDescargas().length + this.dataService.misEmbarques().length;
+    return this.dataService.misDescargas().length + this.dataService.misEmbarques().length + this.dataService.misHorasTrabajadas().length;
   });
 
   personalCount = computed(() => {

@@ -14,7 +14,7 @@ export interface FaenaAuditoria {
   trabajadorId: string;
   fecha: string;
   diaSemana: string;
-  tipo: 'DESCARGA' | 'EMBARQUE';
+  tipo: 'DESCARGA' | 'EMBARQUE' | 'HORAS';
   detalle: string;
   companeros?: string;
   observaciones?: string;
@@ -72,7 +72,7 @@ export class ReportesComponent {
   fechaHasta = signal<string>('');
   filtroPeriodo = signal<'hoy' | '7dias' | 'mes' | 'semana_abril' | 'todo'>('todo');
   filtroEstado = signal<'todos' | 'abiertos' | 'cerrados'>('todos');
-  filtroTipoOperacion = signal<'TODOS' | 'DESCARGA' | 'EMBARQUE'>('TODOS');
+  filtroTipoOperacion = signal<'TODOS' | 'DESCARGA' | 'EMBARQUE' | 'HORAS'>('TODOS');
 
   // Notificación flotante
   mensajeExito = signal<string>('');
@@ -91,8 +91,8 @@ export class ReportesComponent {
       }
       if (params['tipo']) {
         const t = String(params['tipo']).toUpperCase();
-        if (t === 'DESCARGA' || t === 'EMBARQUE' || t === 'TODOS') {
-          this.filtroTipoOperacion.set(t as 'TODOS' | 'DESCARGA' | 'EMBARQUE');
+        if (t === 'DESCARGA' || t === 'EMBARQUE' || t === 'HORAS' || t === 'TODOS') {
+          this.filtroTipoOperacion.set(t as 'TODOS' | 'DESCARGA' | 'EMBARQUE' | 'HORAS');
         }
       }
     });
@@ -230,6 +230,32 @@ export class ReportesComponent {
           estado: estaPagado ? 'Pagado' : 'Por Liquidar',
           operacionId: e.id
         });
+      });
+    });
+
+    // 3. Transformamos registros de horas trabajadas
+    const horas = this.dataService.misHorasTrabajadas();
+    horas.forEach((h, hIdx) => {
+      const numRegistro = '#' + (200 + hIdx + 1);
+      const estaPagado = !!h.pagado;
+      const diaSemanaHoras = this.obtenerDiaSemana(h.fecha);
+
+      lista.push({
+        numero: numRegistro,
+        trabajador: h.trabajador_nombre || 'Trabajador',
+        trabajadorId: h.trabajador_id,
+        fecha: h.fecha,
+        diaSemana: diaSemanaHoras,
+        tipo: 'HORAS',
+        detalle: `${h.horas} hr(s) ${h.actividad ? '(' + h.actividad + ')' : 'Jornal'} @ $${h.tarifa_por_hora.toFixed(2)}/h`,
+        companeros: 'N/A',
+        observaciones: h.observaciones,
+        monto: h.total_pago,
+        pagado: estaPagado,
+        montoPagado: estaPagado ? h.total_pago : 0,
+        montoPendiente: estaPagado ? 0 : h.total_pago,
+        estado: estaPagado ? (esAdmin ? 'Pagado' : 'Cobrado') : (esAdmin ? 'Por Liquidar' : 'Por Cobrar'),
+        operacionId: h.id
       });
     });
 
@@ -393,17 +419,20 @@ export class ReportesComponent {
     this.guardando.set(true);
     const nuevoEstado = !t.pagado;
     const esDescarga = t.tipo === 'DESCARGA';
+    const esHoras = t.tipo === 'HORAS';
+    const esAdmin = this.authService.esAdmin();
+
     this.feedbackService.iniciarCarga(
       nuevoEstado
-        ? (esDescarga ? `Registrando cobro de ${t.trabajador}...` : `Registrando pago de ${t.trabajador}...`)
-        : (esDescarga ? `Desmarcando cobro de ${t.trabajador}...` : `Desmarcando pago de ${t.trabajador}...`)
+        ? (esDescarga ? `Registrando cobro de ${t.trabajador}...` : (esHoras ? `Registrando cobro de horas de ${t.trabajador}...` : `Registrando pago de ${t.trabajador}...`))
+        : (esDescarga ? `Desmarcando cobro de ${t.trabajador}...` : (esHoras ? `Desmarcando cobro de horas de ${t.trabajador}...` : `Desmarcando pago de ${t.trabajador}...`))
     );
     try {
       await this.dataService.cambiarEstadoPago(t.tipo, t.operacionId, t.trabajadorId, nuevoEstado);
       this.feedbackService.finalizarExito(
         nuevoEstado
-          ? (esDescarga ? `Descarga de ${t.trabajador} marcada como cobrada` : `Embarque de ${t.trabajador} marcado como pagado`)
-          : (esDescarga ? `Cobro de ${t.trabajador} desmarcado` : `Pago de ${t.trabajador} desmarcado`)
+          ? (esDescarga ? `Descarga de ${t.trabajador} marcada como cobrada` : (esHoras ? `Horas de ${t.trabajador} marcadas como ${esAdmin ? 'pagadas' : 'cobradas'}` : `Embarque de ${t.trabajador} marcado como pagado`))
+          : (esDescarga ? `Cobro de ${t.trabajador} desmarcado` : (esHoras ? `Cobro de horas de ${t.trabajador} desmarcado` : `Pago de ${t.trabajador} desmarcado`))
       );
     } catch (err) {
       this.feedbackService.finalizarError('Error al actualizar estado');
@@ -459,7 +488,9 @@ export class ReportesComponent {
         ? 'AUDITORÍA DE BAJADA DE MADERA (CARROS)'
         : tipoOp === 'EMBARQUE'
           ? 'AUDITORÍA DE EMBARQUE DE TRÁILERS'
-          : 'AUDITORÍA Y BALANCE OFICIAL DE CUADRILLA';
+          : tipoOp === 'HORAS'
+            ? 'AUDITORÍA DE HORAS TRABAJADAS'
+            : 'AUDITORÍA Y BALANCE OFICIAL DE CUADRILLA';
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
@@ -655,12 +686,14 @@ export class ReportesComponent {
             } else {
               detalleTexto = `Descarga individual (Solo)\n${f.detalle}`;
             }
-          } else {
+          } else if (f.tipo === 'EMBARQUE') {
             if (f.companeros && f.companeros !== 'Solo') {
               detalleTexto = `Cuadrilla: ${f.companeros}\n${f.detalle}`;
             } else {
               detalleTexto = f.detalle;
             }
+          } else {
+            detalleTexto = f.detalle;
           }
 
           if (f.observaciones) {
@@ -669,11 +702,15 @@ export class ReportesComponent {
 
           const fechaTexto = f.diaSemana ? `${f.fecha}\n${f.diaSemana}` : f.fecha;
 
+          const tipoLabel = f.tipo === 'DESCARGA'
+            ? 'Bajada Carros'
+            : (f.tipo === 'EMBARQUE' ? 'Embarque Tráiler' : 'Horas Trabajadas');
+
           filasDetalle.push([
             f.numero,
             fechaTexto,
             f.trabajador,
-            f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
+            tipoLabel,
             detalleTexto,
             `$${f.monto.toFixed(2)}`,
             f.estado

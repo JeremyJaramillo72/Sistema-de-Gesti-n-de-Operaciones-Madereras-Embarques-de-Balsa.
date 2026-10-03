@@ -56,12 +56,29 @@ export interface EmbarqueTrailer {
   created_at?: string;
 }
 
+export interface RegistroHoraTrabajada {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  trabajador_id: string;
+  trabajador_nombre: string;
+  horas: number; // Ej: 8, 4, 6.5
+  tarifa_por_hora: number; // Por defecto $2.50
+  total_pago: number; // horas * tarifa_por_hora
+  actividad?: string; // Ej: "Jornal General", "Corte de balsa", "Limpieza", etc.
+  observaciones?: string;
+  pagado: boolean;
+  fecha_pago?: string;
+  usuario_id?: string;
+  usuario_creador?: string;
+  created_at?: string;
+}
+
 export interface MovimientoLiquidacion {
   id: string;
   operacion_id: string;
   detalle_id?: string;
   fecha: string;
-  tipo: 'DESCARGA' | 'EMBARQUE';
+  tipo: 'DESCARGA' | 'EMBARQUE' | 'HORAS';
   descripcion: string;
   trabajador_id: string;
   trabajador_nombre: string;
@@ -75,7 +92,7 @@ export interface FiltroReporte {
   fecha_fin?: string;
   trabajador_id?: string;
   estado_pago?: 'todos' | 'pagado' | 'pendiente';
-  tipo_operacion?: 'todos' | 'descargas' | 'embarques';
+  tipo_operacion?: 'todos' | 'descargas' | 'embarques' | 'horas';
 }
 
 export interface ResumenReporte {

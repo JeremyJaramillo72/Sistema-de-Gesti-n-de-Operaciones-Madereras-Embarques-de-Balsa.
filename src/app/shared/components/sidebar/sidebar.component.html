@@ -57,6 +57,20 @@
           {{ trailersCount() }}
         </span>
       </a>
+
+      <a routerLink="/horas" routerLinkActive="bg-slate-900 text-white shadow-xs font-semibold"
+        class="w-full px-3 py-2.5 rounded-xl text-xs text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-medium transition-all flex items-center justify-between group">
+        <div class="flex items-center gap-2.5">
+          <svg class="w-4 h-4 opacity-75 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" stroke-width="2"/>
+            <polyline points="12 6 12 12 16 14" stroke-width="2"/>
+          </svg>
+          <span>Horas Trabajadas</span>
+        </div>
+        <span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-600">
+          {{ horasCount() }}
+        </span>
+      </a>
     </div>
 
     <!-- 3. NÓMINA & LIQUIDACIÓN -->

@@ -68,6 +68,16 @@
         </svg>
         <span>+ Tráiler</span>
       </a>
+
+      <!-- Botón Terciario: Horas -->
+      <a routerLink="/horas"
+        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 shadow-2xs transition-all apple-btn-active min-h-[36px]">
+        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" stroke-width="2"/>
+          <polyline points="12 6 12 12 16 14" stroke-width="2"/>
+        </svg>
+        <span>+ Horas</span>
+      </a>
     </div>
   </div>
 
@@ -373,8 +383,8 @@
             <div class="p-3 rounded-xl border border-slate-100 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-3 text-xs">
               <div class="flex items-center gap-2.5">
                 <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border"
-                  [ngClass]="op.tipo === 'DESCARGA' ? 'bg-slate-50 text-slate-800 border-slate-200/80' : 'bg-slate-100 text-slate-900 border-slate-200'">
-                  {{ op.tipo === 'DESCARGA' ? '🪵' : '🚛' }}
+                  [ngClass]="op.tipo === 'DESCARGA' ? 'bg-slate-50 text-slate-800 border-slate-200/80' : (op.tipo === 'EMBARQUE' ? 'bg-slate-100 text-slate-900 border-slate-200' : 'bg-amber-50 text-amber-900 border-amber-200')">
+                  {{ op.tipo === 'DESCARGA' ? '🪵' : (op.tipo === 'EMBARQUE' ? '🚛' : '⏱️') }}
                 </div>
                 <div>
                   <span class="font-semibold text-slate-900 block leading-tight">{{ op.titulo }}</span>
@@ -386,7 +396,7 @@
                 <span class="font-bold text-slate-900 font-mono block">${{ op.monto | number:'1.2-2' }}</span>
                 <span class="inline-block text-[10px] font-bold px-1.5 py-0.2 rounded-md"
                   [ngClass]="op.pagado ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'">
-                  {{ op.tipo === 'DESCARGA' ? (op.pagado ? 'Cobrado' : 'Por Cobrar') : (op.pagado ? 'Pagado' : 'Pendiente') }}
+                  {{ op.tipo === 'DESCARGA' || op.tipo === 'HORAS' ? (op.pagado ? 'Cobrado' : 'Por Cobrar') : (op.pagado ? 'Pagado' : 'Pendiente') }}
                 </span>
               </div>
             </div>

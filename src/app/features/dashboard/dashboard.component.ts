@@ -154,6 +154,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
       }
     }
 
+    const horas = this.dataService.misHorasTrabajadas();
+    for (const h of horas) {
+      const item = mapa.get(h.trabajador_id);
+      if (item) {
+        item.total += Number(h.total_pago || 0);
+        item.faenas += 1;
+      }
+    }
+
     const items: TopTrabajador[] = [];
     mapa.forEach((val, key) => {
       if (val.faenas > 0) {
@@ -214,7 +223,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
         };
       });
 
-    return [...descargas, ...embarques]
+    const horas = this.dataService.misHorasTrabajadas()
+      .filter(h => this.dataService.esMiRegistro(h))
+      .map(h => ({
+        id: h.id,
+        tipo: 'HORAS' as const,
+        fecha: h.fecha,
+        titulo: `${h.horas} hr(s) • ${h.actividad || 'Jornal'}`,
+        subtitulo: h.trabajador_nombre,
+        monto: h.total_pago,
+        totalCarro: h.total_pago,
+        pagado: h.pagado
+      }));
+
+    return [...descargas, ...embarques, ...horas]
       .sort((a, b) => b.fecha.localeCompare(a.fecha))
       .slice(0, 4);
   });

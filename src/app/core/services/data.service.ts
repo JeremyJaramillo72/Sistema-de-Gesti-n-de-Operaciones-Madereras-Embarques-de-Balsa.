@@ -6,6 +6,7 @@ import {
   Trabajador,
   DescargaMadera,
   EmbarqueTrailer,
+  RegistroHoraTrabajada,
   MovimientoLiquidacion,
   FiltroReporte,
   ResumenReporte
@@ -14,7 +15,8 @@ import {
 const STORAGE_KEYS = {
   TRABAJADORES: 'boya_trabajadores',
   DESCARGAS: 'boya_descargas',
-  EMBARQUES: 'boya_embarques'
+  EMBARQUES: 'boya_embarques',
+  HORAS: 'boya_horas_trabajadas'
 };
 
 @Injectable({
@@ -30,6 +32,7 @@ export class DataService {
   public trabajadores = signal<Trabajador[]>([]);
   public descargas = signal<DescargaMadera[]>([]);
   public embarques = signal<EmbarqueTrailer[]>([]);
+  public horasTrabajadas = signal<RegistroHoraTrabajada[]>([]);
   public cargando = signal<boolean>(false);
 
   // Lista unificada de trabajadores que garantiza incluir siempre al usuario en sesión
@@ -216,6 +219,10 @@ export class DataService {
     this.embarques().filter(e => this.esMiRegistro(e))
   );
 
+  public misHorasTrabajadas = computed(() =>
+    this.horasTrabajadas().filter(h => this.esMiRegistro(h))
+  );
+
   // Totales computados estrictamente para el usuario actual
   public totalCarrosDescargados = computed(() =>
     this.misDescargas().reduce((acc, d) => acc + Number(d.cantidad_carros || 0), 0)
@@ -223,6 +230,14 @@ export class DataService {
 
   public totalTrailersEmbarcados = computed(() =>
     this.misEmbarques().reduce((acc, e) => acc + Number(e.cantidad_trailers || 0), 0)
+  );
+
+  public totalHorasRegistradas = computed(() =>
+    this.misHorasTrabajadas().reduce((acc, h) => acc + Number(h.horas || 0), 0)
+  );
+
+  public totalPagoHoras = computed(() =>
+    this.misHorasTrabajadas().reduce((acc, h) => acc + Number(h.total_pago || 0), 0)
   );
 
   public totalPendienteCobro = computed(() => {
@@ -256,6 +271,17 @@ export class DataService {
       }
     }
 
+    // Horas Trabajadas (jornales por horas a $2.50/hr que Jeremy liquida al personal)
+    for (const h of this.misHorasTrabajadas()) {
+      if (esAdmin) {
+        if (!h.pagado) pendiente += Number(h.total_pago || 0);
+      } else {
+        if (!h.pagado && this.authService.esMiTrabajador({ trabajador_id: h.trabajador_id, trabajador_nombre: h.trabajador_nombre })) {
+          pendiente += Number(h.total_pago || 0);
+        }
+      }
+    }
+
     return pendiente;
   });
 
@@ -283,6 +309,16 @@ export class DataService {
         const mi = trabs.find(t => this.authService.esMiTrabajador(t)) || (trabs.length > 0 ? trabs[0] : null);
         if (mi && mi.pagado) {
           pagado += Number(mi.monto_individual || 0);
+        }
+      }
+    }
+
+    for (const h of this.misHorasTrabajadas()) {
+      if (esAdmin) {
+        if (h.pagado) pagado += Number(h.total_pago || 0);
+      } else {
+        if (h.pagado && this.authService.esMiTrabajador({ trabajador_id: h.trabajador_id, trabajador_nombre: h.trabajador_nombre })) {
+          pagado += Number(h.total_pago || 0);
         }
       }
     }
@@ -474,6 +510,7 @@ export class DataService {
     const rawTrab = localStorage.getItem(STORAGE_KEYS.TRABAJADORES);
     const rawDesc = localStorage.getItem(STORAGE_KEYS.DESCARGAS);
     const rawEmb = localStorage.getItem(STORAGE_KEYS.EMBARQUES);
+    const rawHoras = localStorage.getItem(STORAGE_KEYS.HORAS);
 
     let listaTrab: Trabajador[] = [];
     if (rawTrab) {
@@ -546,13 +583,27 @@ export class DataService {
       this.embarques.set([]);
       localStorage.setItem(STORAGE_KEYS.EMBARQUES, JSON.stringify([]));
     }
+
+    if (rawHoras) {
+      try {
+        const parsed: any[] = JSON.parse(rawHoras);
+        this.horasTrabajadas.set(parsed);
+      } catch (e) {
+        this.horasTrabajadas.set([]);
+      }
+    } else {
+      this.horasTrabajadas.set([]);
+      localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify([]));
+    }
   }
 
   public async reiniciarCuentasACero() {
     this.descargas.set([]);
     this.embarques.set([]);
+    this.horasTrabajadas.set([]);
     localStorage.setItem(STORAGE_KEYS.DESCARGAS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.EMBARQUES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify([]));
   }
 
   // ==========================================
@@ -1091,11 +1142,15 @@ export class DataService {
   // Permite marcar "Pagado" o "Pendiente" a un trabajador
   // ==========================================
   public async cambiarEstadoPago(
-    tipo: 'DESCARGA' | 'EMBARQUE',
+    tipo: 'DESCARGA' | 'EMBARQUE' | 'HORAS',
     operacionId: string,
     trabajadorId: string,
     nuevoEstado: boolean
   ) {
+    if (tipo === 'HORAS') {
+      return this.cambiarEstadoPagoHora(operacionId, nuevoEstado);
+    }
+
     const fechaPago = nuevoEstado ? new Date().toISOString() : undefined;
 
     if (tipo === 'DESCARGA') {
@@ -1156,8 +1211,12 @@ export class DataService {
   }
 
   // Marcar toda una operación como pagada
-  public async marcarOperacionCompletaPagada(tipo: 'DESCARGA' | 'EMBARQUE', operacionId: string) {
+  public async marcarOperacionCompletaPagada(tipo: 'DESCARGA' | 'EMBARQUE' | 'HORAS', operacionId: string) {
     const fechaPago = new Date().toISOString();
+
+    if (tipo === 'HORAS') {
+      return this.cambiarEstadoPagoHora(operacionId, true);
+    }
 
     if (tipo === 'DESCARGA') {
       const lista = this.descargas().map(d => {
@@ -1204,6 +1263,133 @@ export class DataService {
         );
       }
     }
+  }
+
+  // ==========================================
+  // MÉTODOS DE NEGOCIO: HORAS TRABAJADAS
+  // Tarifa estándar por defecto: $2.50 / hora
+  // ==========================================
+  public async registrarHoras(datos: {
+    fecha: string;
+    trabajadores_ids: string[];
+    horas: number;
+    tarifa_por_hora?: number;
+    actividad?: string;
+    observaciones?: string;
+  }): Promise<RegistroHoraTrabajada[]> {
+    const user = this.authService.usuarioActual();
+    const userId = user?.id || 'usr_admin_jeremy';
+    const userNom = user?.usuario || 'Jeremy';
+    const tarifa = datos.tarifa_por_hora !== undefined ? Number(datos.tarifa_por_hora) : 2.50;
+    const horas = Number(datos.horas);
+    const montoInd = Number((horas * tarifa).toFixed(2));
+    const fechaCreacion = new Date().toISOString();
+
+    const nuevos: RegistroHoraTrabajada[] = [];
+
+    for (const trabId of datos.trabajadores_ids) {
+      const trab = this.trabajadores().find(w => w.id === trabId);
+      const nombre = trab ? (trab.alias || trab.nombre) : 'Trabajador';
+      const nuevo: RegistroHoraTrabajada = {
+        id: crypto.randomUUID ? crypto.randomUUID() : 'hora_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+        fecha: datos.fecha,
+        trabajador_id: trabId,
+        trabajador_nombre: nombre,
+        horas,
+        tarifa_por_hora: tarifa,
+        total_pago: montoInd,
+        actividad: datos.actividad || 'Jornal General',
+        observaciones: datos.observaciones || '',
+        pagado: false,
+        usuario_id: userId,
+        usuario_creador: userNom,
+        created_at: fechaCreacion
+      };
+      nuevos.push(nuevo);
+    }
+
+    const actualizados = [...nuevos, ...this.horasTrabajadas()];
+    this.horasTrabajadas.set(actualizados);
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(actualizados));
+
+    return nuevos;
+  }
+
+  public async actualizarRegistroHora(id: string, datos: {
+    fecha: string;
+    trabajador_id: string;
+    horas: number;
+    tarifa_por_hora?: number;
+    actividad?: string;
+    observaciones?: string;
+    pagado?: boolean;
+  }): Promise<RegistroHoraTrabajada | null> {
+    const tarifa = datos.tarifa_por_hora !== undefined ? Number(datos.tarifa_por_hora) : 2.50;
+    const horas = Number(datos.horas);
+    const montoInd = Number((horas * tarifa).toFixed(2));
+
+    const trab = this.trabajadores().find(w => w.id === datos.trabajador_id);
+    const nombre = trab ? (trab.alias || trab.nombre) : 'Trabajador';
+
+    let modificado: RegistroHoraTrabajada | null = null;
+    const lista = this.horasTrabajadas().map(h => {
+      if (h.id === id) {
+        modificado = {
+          ...h,
+          fecha: datos.fecha,
+          trabajador_id: datos.trabajador_id,
+          trabajador_nombre: nombre,
+          horas,
+          tarifa_por_hora: tarifa,
+          total_pago: montoInd,
+          actividad: datos.actividad !== undefined ? datos.actividad : h.actividad,
+          observaciones: datos.observaciones !== undefined ? datos.observaciones : h.observaciones,
+          pagado: datos.pagado !== undefined ? datos.pagado : h.pagado
+        };
+        return modificado;
+      }
+      return h;
+    });
+
+    this.horasTrabajadas.set(lista);
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+    return modificado;
+  }
+
+  public async eliminarRegistroHora(id: string): Promise<boolean> {
+    const lista = this.horasTrabajadas().filter(h => h.id !== id);
+    this.horasTrabajadas.set(lista);
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+    return true;
+  }
+
+  public async cambiarEstadoPagoHora(id: string, nuevoEstado: boolean): Promise<void> {
+    const fechaPago = nuevoEstado ? new Date().toISOString() : undefined;
+    const lista = this.horasTrabajadas().map(h => {
+      if (h.id === id) {
+        return {
+          ...h,
+          pagado: nuevoEstado,
+          fecha_pago: fechaPago
+        };
+      }
+      return h;
+    });
+    this.horasTrabajadas.set(lista);
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+  }
+
+  public async marcarTodasHorasPagadas(ids?: string[]): Promise<void> {
+    const fechaPago = new Date().toISOString();
+    const setIds = ids ? new Set(ids) : null;
+    const lista = this.horasTrabajadas().map(h => {
+      if (!setIds || setIds.has(h.id)) {
+        return { ...h, pagado: true, fecha_pago: fechaPago };
+      }
+      return h;
+    });
+    this.horasTrabajadas.set(lista);
+    localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
   }
 
   // ==========================================
@@ -1287,6 +1473,35 @@ export class DataService {
             fecha_pago: t.fecha_pago
           });
         }
+      }
+    }
+
+    // 3. Filtrar horas trabajadas
+    if (filtro.tipo_operacion === 'todos' || filtro.tipo_operacion === 'horas' || !filtro.tipo_operacion) {
+      for (const h of this.horasTrabajadas()) {
+        if (filtro.fecha_inicio && h.fecha < filtro.fecha_inicio) continue;
+        if (filtro.fecha_fin && h.fecha > filtro.fecha_fin) continue;
+        if (filtro.trabajador_id && h.trabajador_id !== filtro.trabajador_id) continue;
+        if (filtro.estado_pago === 'pagado' && !h.pagado) continue;
+        if (filtro.estado_pago === 'pendiente' && h.pagado) continue;
+
+        const monto = Number(h.total_pago || (h.horas * (h.tarifa_por_hora || 2.50)));
+        totalGenerado += monto;
+        if (h.pagado) totalPagado += monto;
+        else totalPendiente += monto;
+
+        movimientos.push({
+          id: 'mov_hora_' + h.id,
+          operacion_id: h.id,
+          fecha: h.fecha,
+          tipo: 'HORAS',
+          descripcion: `${h.horas} hr(s) ${h.actividad ? '(' + h.actividad + ')' : 'Jornal'} @ $${h.tarifa_por_hora.toFixed(2)}/h`,
+          trabajador_id: h.trabajador_id,
+          trabajador_nombre: h.trabajador_nombre || 'Trabajador',
+          monto: monto,
+          pagado: h.pagado,
+          fecha_pago: h.fecha_pago
+        });
       }
     }
 
