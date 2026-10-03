@@ -194,34 +194,18 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2.5">
-          <!-- Operación Segmented Pills (Todas / Bajada Carros / Embarques) -->
+          <!-- Operación Dropdown / Combo Box (Adaptable para móvil y escritorio) -->
           <div class="flex items-center gap-1.5">
             <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">OPERACIÓN:</span>
-            <div class="bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 flex items-center gap-0.5 text-xs">
-              <button (click)="filtroTipoOperacion.set('TODOS')"
-                [ngClass]="filtroTipoOperacion() === 'TODOS' ? 'bg-white font-bold text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'"
-                class="px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold cursor-pointer">
-                Todas
-              </button>
-              <button (click)="filtroTipoOperacion.set('DESCARGA')"
-                [ngClass]="filtroTipoOperacion() === 'DESCARGA' ? 'bg-[#0f172a] font-bold text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'"
-                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold cursor-pointer">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m20 12-8 8-8-8 8-8z"/></svg>
-                <span>Bajada Carros</span>
-              </button>
-              <button (click)="filtroTipoOperacion.set('EMBARQUE')"
-                [ngClass]="filtroTipoOperacion() === 'EMBARQUE' ? 'bg-[#0f172a] font-bold text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'"
-                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold cursor-pointer">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="13" x="1" y="6" rx="2"/><path d="M17 9h4l3 3v4h-7"/></svg>
-                <span>Embarques</span>
-              </button>
-              <button (click)="filtroTipoOperacion.set('HORAS')"
-                [ngClass]="filtroTipoOperacion() === 'HORAS' ? 'bg-[#0f172a] font-bold text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'"
-                class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all text-xs font-semibold cursor-pointer">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                <span>Horas</span>
-              </button>
-            </div>
+            <select
+              [ngModel]="filtroTipoOperacion()"
+              (ngModelChange)="filtroTipoOperacion.set($event)"
+              class="bg-slate-50 border border-slate-200/90 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-semibold focus:bg-white focus:outline-none min-h-[36px] cursor-pointer">
+              <option value="TODOS">Todas las operaciones</option>
+              <option value="DESCARGA">🪵 Bajada de Carros</option>
+              <option value="EMBARQUE">🚛 Embarques de Tráilers</option>
+              <option value="HORAS">⏱️ Horas Trabajadas</option>
+            </select>
           </div>
 
           <!-- Empleado Dropdown Reactivo -->
@@ -243,7 +227,7 @@
               <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">CUENTA:</span>
               <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
                 <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-                {{ filtroTipoOperacion() === 'EMBARQUE' ? 'Mis Embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Mis Descargas' : 'Mis Registros') }} ({{ authService.usuarioActual()?.nombre }})
+                {{ filtroTipoOperacion() === 'EMBARQUE' ? 'Mis Embarques' : (filtroTipoOperacion() === 'DESCARGA' ? 'Mis Descargas' : (filtroTipoOperacion() === 'HORAS' ? 'Mis Horas' : 'Mis Registros')) }} ({{ authService.usuarioActual()?.nombre }})
               </span>
             </div>
           }
@@ -260,12 +244,12 @@
               <button (click)="filtroEstado.set('abiertos')"
                 [ngClass]="filtroEstado() === 'abiertos' ? 'bg-white font-bold text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'"
                 class="px-2.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer">
-                {{ filtroTipoOperacion() === 'DESCARGA' ? 'Por Cobrar' : 'Por Liquidar' }}
+                {{ filtroTipoOperacion() === 'DESCARGA' || (!authService.esAdmin() && filtroTipoOperacion() === 'HORAS') ? 'Por Cobrar' : 'Por Liquidar' }}
               </button>
               <button (click)="filtroEstado.set('cerrados')"
                 [ngClass]="filtroEstado() === 'cerrados' ? 'bg-white font-bold text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-900'"
                 class="px-2.5 py-1.5 rounded-lg transition-all font-semibold cursor-pointer">
-                {{ filtroTipoOperacion() === 'DESCARGA' ? 'Cobrados' : 'Pagados' }}
+                {{ filtroTipoOperacion() === 'DESCARGA' || (!authService.esAdmin() && filtroTipoOperacion() === 'HORAS') ? 'Cobrados' : 'Pagados' }}
               </button>
             </div>
           </div>

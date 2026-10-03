@@ -493,6 +493,99 @@ export class DataService {
       });
       this.embarques.set(mapeadasEmb);
     }
+
+    // 4. Horas Trabajadas (Carga y sincronización Supabase <-> LocalStorage)
+    const rawHoras = localStorage.getItem(STORAGE_KEYS.HORAS);
+    let horasLocales: RegistroHoraTrabajada[] = [];
+    if (rawHoras) {
+      try {
+        const parsed = JSON.parse(rawHoras);
+        if (Array.isArray(parsed)) {
+          horasLocales = parsed;
+          this.horasTrabajadas.set(horasLocales);
+        }
+      } catch (e) {
+        console.warn('Error parseando horas de localStorage:', e);
+      }
+    }
+
+    try {
+      const horasRes = await this.ejecutarConTimeout(
+        this.supabase
+          .from('horas_trabajadas')
+          .select('*')
+          .order('fecha', { ascending: false }),
+        6000
+      );
+
+      if (horasRes && horasRes.data && !horasRes.error) {
+        const mapeadasHoras: RegistroHoraTrabajada[] = horasRes.data.map((h: any) => {
+          const parsed = this.parseCreatorTag(h.observaciones);
+          return {
+            id: h.id,
+            fecha: h.fecha,
+            trabajador_id: h.trabajador_id,
+            trabajador_nombre: h.trabajador_nombre || 'Trabajador',
+            horas: Number(h.horas),
+            tarifa_por_hora: Number(h.tarifa_por_hora || 2.50),
+            total_pago: Number(h.total_pago),
+            actividad: h.actividad || 'Jornal General',
+            observaciones: parsed.obsLimpia,
+            pagado: !!h.pagado,
+            fecha_pago: h.fecha_pago,
+            usuario_id: h.usuario_id || parsed.usuario_id,
+            usuario_creador: h.usuario_creador || parsed.usuario_creador,
+            created_at: h.created_at
+          };
+        });
+
+        // Combinar datos de Supabase con posibles registros locales no sincronizados
+        const idsSupabase = new Set(mapeadasHoras.map(h => h.id));
+        const pendientesDeSubir = horasLocales.filter(hl => !idsSupabase.has(hl.id));
+        const combinadas = [...mapeadasHoras, ...pendientesDeSubir];
+
+        this.horasTrabajadas.set(combinadas);
+        localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(combinadas));
+
+        if (pendientesDeSubir.length > 0) {
+          this.sincronizarHorasPendientesASupabase(pendientesDeSubir);
+        }
+      }
+    } catch (err) {
+      console.warn('[DataService] No se pudo leer horas_trabajadas de Supabase, manteniendo copia local:', err);
+    }
+  }
+
+  private async sincronizarHorasPendientesASupabase(pendientes: RegistroHoraTrabajada[]) {
+    if (!this.isUsingSupabase() || !this.supabase || pendientes.length === 0) return;
+    try {
+      const inserts = pendientes.map(h => {
+        const tagInfo = this.buildCreatorTag(h.observaciones, h.usuario_id || 'usr_admin_jeremy', h.usuario_creador || 'Jeremy');
+        return {
+          id: h.id,
+          fecha: h.fecha,
+          trabajador_id: h.trabajador_id,
+          trabajador_nombre: h.trabajador_nombre,
+          horas: h.horas,
+          tarifa_por_hora: h.tarifa_por_hora,
+          total_pago: h.total_pago,
+          actividad: h.actividad || 'Jornal General',
+          observaciones: tagInfo.obsConTag,
+          pagado: h.pagado,
+          fecha_pago: h.fecha_pago,
+          usuario_id: h.usuario_id,
+          usuario_creador: h.usuario_creador,
+          created_at: h.created_at || new Date().toISOString()
+        };
+      });
+
+      await this.ejecutarConTimeout(
+        this.supabase.from('horas_trabajadas').upsert(inserts),
+        7500
+      );
+    } catch (e) {
+      console.warn('Error sincronizando horas pendientes a Supabase:', e);
+    }
   }
 
   // ==========================================
@@ -1312,6 +1405,36 @@ export class DataService {
     this.horasTrabajadas.set(actualizados);
     localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(actualizados));
 
+    if (this.isUsingSupabase() && this.supabase) {
+      try {
+        const inserts = nuevos.map(h => {
+          const tagInfo = this.buildCreatorTag(h.observaciones, userId, userNom);
+          return {
+            id: h.id,
+            fecha: h.fecha,
+            trabajador_id: h.trabajador_id,
+            trabajador_nombre: h.trabajador_nombre,
+            horas: h.horas,
+            tarifa_por_hora: h.tarifa_por_hora,
+            total_pago: h.total_pago,
+            actividad: h.actividad || 'Jornal General',
+            observaciones: tagInfo.obsConTag,
+            pagado: h.pagado,
+            usuario_id: userId,
+            usuario_creador: userNom,
+            created_at: h.created_at
+          };
+        });
+
+        await this.ejecutarConTimeout(
+          this.supabase.from('horas_trabajadas').insert(inserts),
+          7500
+        );
+      } catch (err) {
+        console.warn('Error guardando horas en Supabase (permanece local):', err);
+      }
+    }
+
     return nuevos;
   }
 
@@ -1353,6 +1476,30 @@ export class DataService {
 
     this.horasTrabajadas.set(lista);
     localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+
+    if (this.isUsingSupabase() && this.supabase && modificado) {
+      try {
+        const user = this.authService.usuarioActual();
+        const tagInfo = this.buildCreatorTag(datos.observaciones, (modificado as RegistroHoraTrabajada).usuario_id || user?.id || 'usr_admin_jeremy', (modificado as RegistroHoraTrabajada).usuario_creador || user?.usuario || 'Jeremy');
+        await this.ejecutarConTimeout(
+          this.supabase.from('horas_trabajadas').update({
+            fecha: datos.fecha,
+            trabajador_id: datos.trabajador_id,
+            trabajador_nombre: nombre,
+            horas,
+            tarifa_por_hora: tarifa,
+            total_pago: montoInd,
+            actividad: datos.actividad,
+            observaciones: tagInfo.obsConTag,
+            pagado: datos.pagado
+          }).eq('id', id),
+          7500
+        );
+      } catch (err) {
+        console.warn('Error actualizando hora en Supabase (permanece local):', err);
+      }
+    }
+
     return modificado;
   }
 
@@ -1360,6 +1507,18 @@ export class DataService {
     const lista = this.horasTrabajadas().filter(h => h.id !== id);
     this.horasTrabajadas.set(lista);
     localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+
+    if (this.isUsingSupabase() && this.supabase) {
+      try {
+        await this.ejecutarConTimeout(
+          this.supabase.from('horas_trabajadas').delete().eq('id', id),
+          7500
+        );
+      } catch (err) {
+        console.warn('Error eliminando hora en Supabase (permanece local):', err);
+      }
+    }
+
     return true;
   }
 
@@ -1377,6 +1536,20 @@ export class DataService {
     });
     this.horasTrabajadas.set(lista);
     localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+
+    if (this.isUsingSupabase() && this.supabase) {
+      try {
+        await this.ejecutarConTimeout(
+          this.supabase.from('horas_trabajadas').update({
+            pagado: nuevoEstado,
+            fecha_pago: fechaPago
+          }).eq('id', id),
+          7500
+        );
+      } catch (err) {
+        console.warn('Error actualizando pago de hora en Supabase (permanece local):', err);
+      }
+    }
   }
 
   public async marcarTodasHorasPagadas(ids?: string[]): Promise<void> {
@@ -1390,6 +1563,18 @@ export class DataService {
     });
     this.horasTrabajadas.set(lista);
     localStorage.setItem(STORAGE_KEYS.HORAS, JSON.stringify(lista));
+
+    if (this.isUsingSupabase() && this.supabase) {
+      try {
+        let query = this.supabase.from('horas_trabajadas').update({ pagado: true, fecha_pago: fechaPago });
+        if (ids && ids.length > 0) {
+          query = query.in('id', ids);
+        }
+        await this.ejecutarConTimeout(query, 7500);
+      } catch (err) {
+        console.warn('Error marcando horas pagadas en Supabase (permanece local):', err);
+      }
+    }
   }
 
   // ==========================================

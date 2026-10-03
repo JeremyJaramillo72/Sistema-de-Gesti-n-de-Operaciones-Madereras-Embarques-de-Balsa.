@@ -72,11 +72,31 @@ CREATE TABLE IF NOT EXISTS public.usuarios (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 7. Tabla de Horas Trabajadas (Jornales y Horas Extras @ $2.50 base)
+CREATE TABLE IF NOT EXISTS public.horas_trabajadas (
+    id TEXT PRIMARY KEY,
+    fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+    trabajador_id TEXT NOT NULL,
+    trabajador_nombre TEXT NOT NULL,
+    horas NUMERIC(6, 2) NOT NULL DEFAULT 8.00,
+    tarifa_por_hora NUMERIC(10, 2) NOT NULL DEFAULT 2.50,
+    total_pago NUMERIC(10, 2) NOT NULL,
+    actividad TEXT DEFAULT 'Jornal General',
+    observaciones TEXT,
+    pagado BOOLEAN DEFAULT FALSE,
+    fecha_pago TIMESTAMPTZ,
+    usuario_id TEXT,
+    usuario_creador TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- Índices para optimizar reportes por fecha y trabajador
 CREATE INDEX IF NOT EXISTS idx_descargas_fecha ON public.descargas_madera(fecha);
 CREATE INDEX IF NOT EXISTS idx_embarques_fecha ON public.embarques_trailer(fecha);
 CREATE INDEX IF NOT EXISTS idx_descarga_trabajadores_trabajador ON public.descarga_trabajadores(trabajador_id);
 CREATE INDEX IF NOT EXISTS idx_embarque_trabajadores_trabajador ON public.embarque_trabajadores(trabajador_id);
+CREATE INDEX IF NOT EXISTS idx_horas_fecha ON public.horas_trabajadas(fecha);
+CREATE INDEX IF NOT EXISTS idx_horas_trabajador ON public.horas_trabajadas(trabajador_id);
 CREATE INDEX IF NOT EXISTS idx_usuarios_login ON public.usuarios(usuario);
 
 -- ==============================================================================
@@ -89,6 +109,7 @@ ALTER TABLE public.descarga_trabajadores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embarques_trailer ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embarque_trabajadores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.horas_trabajadas ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Permitir todo en trabajadores" ON public.trabajadores FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo en descargas_madera" ON public.descargas_madera FOR ALL USING (true) WITH CHECK (true);
@@ -96,6 +117,7 @@ CREATE POLICY "Permitir todo en descarga_trabajadores" ON public.descarga_trabaj
 CREATE POLICY "Permitir todo en embarques_trailer" ON public.embarques_trailer FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo en embarque_trabajadores" ON public.embarque_trabajadores FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Permitir todo en usuarios" ON public.usuarios FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en horas_trabajadas" ON public.horas_trabajadas FOR ALL USING (true) WITH CHECK (true);
 
 -- ==============================================================================
 -- DATOS INICIALES (Semilla extraída de tus libretas de control)
