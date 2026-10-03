@@ -15,6 +15,7 @@ export interface FaenaAuditoria {
   fecha: string;
   tipo: 'DESCARGA' | 'EMBARQUE';
   detalle: string;
+  companeros?: string;
   observaciones?: string;
   monto: number;
   pagado: boolean;
@@ -142,6 +143,14 @@ export class ReportesComponent {
       const cantPers = Math.max(d.trabajadores.length, 1);
       d.trabajadores.forEach((t, tIdx) => {
         const numRegistro = '#' + (dIdx * 10 + tIdx + 1);
+
+        // Identificar los compañeros de esta bajada de madera
+        const otros = (d.trabajadores || [])
+          .filter(otro => otro.trabajador_id !== t.trabajador_id && (otro.trabajador_nombre || '').trim().toLowerCase() !== (t.trabajador_nombre || '').trim().toLowerCase())
+          .map(otro => otro.trabajador_nombre || 'Trabajador');
+
+        const companerosStr = otros.length > 0 ? otros.join(', ') : 'Solo';
+
         lista.push({
           numero: numRegistro,
           trabajador: t.trabajador_nombre || 'Trabajador',
@@ -149,6 +158,7 @@ export class ReportesComponent {
           fecha: d.fecha,
           tipo: 'DESCARGA',
           detalle: `${d.cantidad_carros} Carro(s) • ${d.filas_por_carro} filas ($${d.total_pago.toFixed(2)} total ÷ ${cantPers} pers.)`,
+          companeros: companerosStr,
           observaciones: d.observaciones,
           monto: t.monto_individual,
           pagado: !!t.pagado,
@@ -165,6 +175,13 @@ export class ReportesComponent {
       e.trabajadores.forEach((t, tIdx) => {
         const numRegistro = '#' + (100 + eIdx * 10 + tIdx);
         const estaPagado = !!t.pagado;
+
+        const otrosEmb = (e.trabajadores || [])
+          .filter(otro => otro.trabajador_id !== t.trabajador_id && (otro.trabajador_nombre || '').trim().toLowerCase() !== (t.trabajador_nombre || '').trim().toLowerCase())
+          .map(otro => otro.trabajador_nombre || 'Trabajador');
+
+        const companerosEmb = otrosEmb.length > 0 ? otrosEmb.join(', ') : 'Solo';
+
         lista.push({
           numero: numRegistro,
           trabajador: t.trabajador_nombre || 'Trabajador',
@@ -172,6 +189,7 @@ export class ReportesComponent {
           fecha: e.fecha,
           tipo: 'EMBARQUE',
           detalle: `${e.cantidad_trailers} Tráiler(s) de Bloques ($7.00/pers)`,
+          companeros: companerosEmb,
           observaciones: e.observaciones,
           monto: t.monto_individual,
           pagado: estaPagado,
@@ -211,13 +229,14 @@ export class ReportesComponent {
       if (desde && fechaItem < desde) return false;
       if (hasta && fechaItem > hasta) return false;
 
-      // Búsqueda en vivo por texto (Trabajador, número de faena, detalle, notas)
+      // Búsqueda en vivo por texto (Trabajador, compañeros, número de faena, detalle, notas)
       if (texto) {
         const matchTrabajador = item.trabajador.toLowerCase().includes(texto);
+        const matchCompaneros = item.companeros ? item.companeros.toLowerCase().includes(texto) : false;
         const matchNumero = item.numero.toLowerCase().includes(texto);
         const matchDetalle = item.detalle.toLowerCase().includes(texto);
         const matchObs = item.observaciones ? item.observaciones.toLowerCase().includes(texto) : false;
-        if (!matchTrabajador && !matchNumero && !matchDetalle && !matchObs) return false;
+        if (!matchTrabajador && !matchCompaneros && !matchNumero && !matchDetalle && !matchObs) return false;
       }
 
       // Empleado dropdown / query param (búsqueda normalizada insensible a mayúsculas, tildes o coincidencia por ID)
@@ -497,15 +516,28 @@ export class ReportesComponent {
       doc.text('2. DETALLE CRONOLÓGICO DE MOVIMIENTOS Y JORNALES', 14, currentY);
       currentY += 3;
 
-      const filasDetalle = faenas.map(f => [
-        f.numero,
-        f.fecha,
-        f.trabajador,
-        f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
-        f.detalle,
-        `$${f.monto.toFixed(2)}`,
-        f.estado
-      ]);
+      const filasDetalle = faenas.map(f => {
+        let detalleTexto = f.detalle;
+        if (f.companeros && f.companeros !== 'Solo') {
+          detalleTexto += f.tipo === 'DESCARGA' 
+            ? `\nDescargó con: ${f.companeros}` 
+            : `\nCuadrilla: ${f.companeros}`;
+        } else if (f.companeros === 'Solo' && f.tipo === 'DESCARGA') {
+          detalleTexto += '\nDescarga individual (Solo)';
+        }
+        if (f.observaciones) {
+          detalleTexto += `\n"${f.observaciones}"`;
+        }
+        return [
+          f.numero,
+          f.fecha,
+          f.trabajador,
+          f.tipo === 'DESCARGA' ? 'Bajada Carros' : 'Embarque Tráiler',
+          detalleTexto,
+          `$${f.monto.toFixed(2)}`,
+          f.estado
+        ];
+      });
 
       autoTable(doc, {
         startY: currentY,
@@ -600,6 +632,7 @@ export class ReportesComponent {
       Fecha: t.fecha,
       Operacion: t.tipo === 'DESCARGA' ? 'Bajada de Madera' : 'Embarque de Tráiler',
       Detalle: t.detalle,
+      'Acompañantes / Cuadrilla': t.companeros || 'Solo',
       'Monto Jornal / A Cobrar ($)': t.monto,
       'Monto Pagado / Cobrado ($)': t.montoPagado,
       'Saldo Pendiente ($)': t.montoPendiente,
