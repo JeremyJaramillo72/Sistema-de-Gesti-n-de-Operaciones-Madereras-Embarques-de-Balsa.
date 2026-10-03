@@ -72,7 +72,36 @@ export class ReportesComponent {
   fechaHasta = signal<string>('');
   filtroPeriodo = signal<'hoy' | '7dias' | 'mes' | 'semana_abril' | 'todo'>('todo');
   filtroEstado = signal<'todos' | 'abiertos' | 'cerrados'>('todos');
-  filtroTipoOperacion = signal<'TODOS' | 'DESCARGA' | 'EMBARQUE' | 'HORAS'>('TODOS');
+
+  // Control de operaciones seleccionadas (Múltiple / Individual / Todas)
+  dropdownOperacionesAbierto = signal<boolean>(false);
+  operacionesSeleccionadas = signal<('DESCARGA' | 'EMBARQUE' | 'HORAS')[]>(['DESCARGA', 'EMBARQUE', 'HORAS']);
+  private longPressTimer: any = null;
+  private seEjecutoLongPress = false;
+
+  filtroTipoOperacion = computed<'TODOS' | 'DESCARGA' | 'EMBARQUE' | 'HORAS' | 'MULTIPLE'>(() => {
+    const ops = this.operacionesSeleccionadas();
+    if (ops.length === 3 || ops.length === 0) return 'TODOS';
+    if (ops.length === 1) return ops[0];
+    return 'MULTIPLE';
+  });
+
+  textoOperacionesSeleccionadas = computed<string>(() => {
+    const ops = this.operacionesSeleccionadas();
+    if (ops.length === 3) return 'Todas las operaciones';
+    if (ops.length === 0) return 'Ninguna operación';
+    if (ops.length === 1) {
+      if (ops[0] === 'DESCARGA') return '🪵 Bajada de Carros';
+      if (ops[0] === 'EMBARQUE') return '🚛 Embarque Tráilers';
+      return '⏱️ Horas Trabajadas';
+    }
+    const nombres: Record<string, string> = {
+      'DESCARGA': '🪵 Carros',
+      'EMBARQUE': '🚛 Embarques',
+      'HORAS': '⏱️ Horas'
+    };
+    return ops.map(o => nombres[o] || o).join(' + ') + ' (2)';
+  });
 
   // Notificación flotante
   mensajeExito = signal<string>('');
@@ -91,11 +120,78 @@ export class ReportesComponent {
       }
       if (params['tipo']) {
         const t = String(params['tipo']).toUpperCase();
-        if (t === 'DESCARGA' || t === 'EMBARQUE' || t === 'HORAS' || t === 'TODOS') {
-          this.filtroTipoOperacion.set(t as 'TODOS' | 'DESCARGA' | 'EMBARQUE' | 'HORAS');
+        if (t === 'DESCARGA' || t === 'EMBARQUE' || t === 'HORAS') {
+          this.operacionesSeleccionadas.set([t as 'DESCARGA' | 'EMBARQUE' | 'HORAS']);
+        } else if (t === 'TODOS') {
+          this.operacionesSeleccionadas.set(['DESCARGA', 'EMBARQUE', 'HORAS']);
         }
       }
     });
+  }
+
+  toggleDropdownOperaciones() {
+    this.dropdownOperacionesAbierto.update(v => !v);
+  }
+
+  cerrarDropdownOperaciones() {
+    this.dropdownOperacionesAbierto.set(false);
+  }
+
+  estaOperacionSeleccionada(op: 'DESCARGA' | 'EMBARQUE' | 'HORAS'): boolean {
+    return this.operacionesSeleccionadas().includes(op);
+  }
+
+  toggleOperacion(op: 'DESCARGA' | 'EMBARQUE' | 'HORAS') {
+    const actuales = this.operacionesSeleccionadas();
+    if (actuales.includes(op)) {
+      const nuevas = actuales.filter(o => o !== op);
+      // Si desmarca todas, volvemos a marcar todas para que no quede vacía
+      this.operacionesSeleccionadas.set(nuevas.length === 0 ? ['DESCARGA', 'EMBARQUE', 'HORAS'] : nuevas);
+    } else {
+      this.operacionesSeleccionadas.set([...actuales, op]);
+    }
+  }
+
+  seleccionarSoloOperacion(op: 'DESCARGA' | 'EMBARQUE' | 'HORAS') {
+    this.operacionesSeleccionadas.set([op]);
+    this.dropdownOperacionesAbierto.set(false);
+  }
+
+  seleccionarTodasOperaciones() {
+    this.operacionesSeleccionadas.set(['DESCARGA', 'EMBARQUE', 'HORAS']);
+  }
+
+  iniciarLongPress(op: 'DESCARGA' | 'EMBARQUE' | 'HORAS') {
+    this.seEjecutoLongPress = false;
+    this.longPressTimer = setTimeout(() => {
+      this.seEjecutoLongPress = true;
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        try { navigator.vibrate(50); } catch (_) {}
+      }
+      this.toggleOperacion(op);
+      const nombres: Record<string, string> = {
+        'DESCARGA': 'Bajada de Carros',
+        'EMBARQUE': 'Embarque Tráilers',
+        'HORAS': 'Horas Trabajadas'
+      };
+      this.mostrarNotificacion(`Selección combinada: ${nombres[op] || op}`);
+    }, 450);
+  }
+
+  cancelarLongPress() {
+    if (this.longPressTimer) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+  }
+
+  onItemClick(op: 'DESCARGA' | 'EMBARQUE' | 'HORAS', event: MouseEvent | TouchEvent) {
+    if (this.seEjecutoLongPress) {
+      this.seEjecutoLongPress = false;
+      event.preventDefault();
+      return;
+    }
+    this.toggleOperacion(op);
   }
 
   onFechaDesdeChange(val: string) {
@@ -153,7 +249,7 @@ export class ReportesComponent {
     this.fechaHasta.set('');
     this.filtroPeriodo.set('todo');
     this.filtroEstado.set('todos');
-    this.filtroTipoOperacion.set('TODOS');
+    this.operacionesSeleccionadas.set(['DESCARGA', 'EMBARQUE', 'HORAS']);
     this.mostrarNotificacion('Filtros restablecidos');
   }
 
@@ -278,8 +374,9 @@ export class ReportesComponent {
       }
 
 
-      // Filtro por tipo de operación (DESCARGA vs EMBARQUE)
-      if (tipoOp !== 'TODOS' && item.tipo !== tipoOp) return false;
+      // Filtro por tipo de operación (DESCARGA vs EMBARQUE vs HORAS - Múltiple o Individual)
+      const ops = this.operacionesSeleccionadas();
+      if (ops.length > 0 && ops.length < 3 && !ops.includes(item.tipo)) return false;
 
       const fechaItem = item.fecha;
 
@@ -810,7 +907,7 @@ export class ReportesComponent {
       Trabajador: t.trabajador,
       Fecha: t.fecha,
       'Día': t.diaSemana,
-      Operacion: t.tipo === 'DESCARGA' ? 'Bajada de Madera' : 'Embarque de Tráiler',
+      Operacion: t.tipo === 'DESCARGA' ? 'Bajada de Madera' : (t.tipo === 'EMBARQUE' ? 'Embarque de Tráiler' : 'Horas Trabajadas'),
       'Descargó con / Cuadrilla': t.companeros || 'Solo',
       Detalle: t.detalle,
       'Monto Jornal / A Cobrar ($)': t.monto,
@@ -825,13 +922,17 @@ export class ReportesComponent {
       ? 'auditoria-bajadas-carros-boya.csv'
       : tipo === 'EMBARQUE'
         ? 'auditoria-embarques-trailers-boya.csv'
-        : 'auditoria-faenas-boya.csv';
+        : tipo === 'HORAS'
+          ? 'auditoria-horas-trabajadas-boya.csv'
+          : 'auditoria-faenas-boya.csv';
 
     const etiqueta = tipo === 'DESCARGA'
       ? 'Bajadas de Carros'
       : tipo === 'EMBARQUE'
         ? 'Embarque de Tráilers'
-        : 'General';
+        : tipo === 'HORAS'
+          ? 'Horas Trabajadas'
+          : 'Combinada';
 
     this.dataService.exportarCSV(filas, nombreArchivo);
     this.feedbackService.finalizarExito(`Reporte CSV (${etiqueta}) exportado con éxito`);
