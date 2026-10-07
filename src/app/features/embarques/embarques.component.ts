@@ -38,13 +38,13 @@ export class EmbarquesComponent {
 
   // Datos del formulario
   fecha = new Date().toISOString().split('T')[0];
-  cantidadTrailers = 1;
-  tarifaPorPersona = 7.00;
+  cantidadTrailers = signal<number>(1);
+  tarifaPorPersona = signal<number>(7.00);
   observaciones = '';
   seleccionadosIds = signal<string[]>([]);
 
   montoPorPersonaCalculado = computed(() => {
-    return Number((this.cantidadTrailers * this.tarifaPorPersona).toFixed(2));
+    return Number((this.cantidadTrailers() * this.tarifaPorPersona()).toFixed(2));
   });
 
   totalCalculado = computed(() => {
@@ -216,8 +216,8 @@ export class EmbarquesComponent {
     this.modoEdicion.set(false);
     this.idEnEdicion.set(null);
     this.fecha = new Date().toISOString().split('T')[0];
-    this.cantidadTrailers = 1;
-    this.tarifaPorPersona = 7.00;
+    this.cantidadTrailers.set(1);
+    this.tarifaPorPersona.set(7.00);
     this.observaciones = '';
     this.seleccionarTrabajadorPorDefecto();
     this.mostrarFormulario.set(true);
@@ -233,8 +233,8 @@ export class EmbarquesComponent {
     this.modoEdicion.set(true);
     this.idEnEdicion.set(e.id);
     this.fecha = e.fecha;
-    this.cantidadTrailers = e.cantidad_trailers;
-    this.tarifaPorPersona = e.tarifa_por_persona_trailer;
+    this.cantidadTrailers.set(e.cantidad_trailers);
+    this.tarifaPorPersona.set(e.tarifa_por_persona_trailer);
     this.observaciones = e.observaciones || '';
     this.seleccionadosIds.set(e.trabajadores.map(t => t.trabajador_id));
     this.mostrarFormulario.set(true);
@@ -283,8 +283,8 @@ export class EmbarquesComponent {
       if (esEdicion) {
         await this.dataService.actualizarEmbarque(this.idEnEdicion()!, {
           fecha: this.fecha,
-          cantidad_trailers: Number(this.cantidadTrailers),
-          tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
+          cantidad_trailers: Number(this.cantidadTrailers()),
+          tarifa_por_persona_trailer: Number(this.tarifaPorPersona()),
           trabajadores_ids: this.seleccionadosIds(),
           observaciones: this.observaciones
         });
@@ -293,8 +293,8 @@ export class EmbarquesComponent {
       } else {
         await this.dataService.registrarEmbarque({
           fecha: this.fecha,
-          cantidad_trailers: Number(this.cantidadTrailers),
-          tarifa_por_persona_trailer: Number(this.tarifaPorPersona),
+          cantidad_trailers: Number(this.cantidadTrailers()),
+          tarifa_por_persona_trailer: Number(this.tarifaPorPersona()),
           trabajadores_ids: this.seleccionadosIds(),
           observaciones: this.observaciones
         });

@@ -38,14 +38,14 @@ export class DescargasComponent {
 
   // DATOS DEL FORMULARIO
   fecha = new Date().toISOString().split('T')[0];
-  cantidadCarros = 1;
-  filasPorCarro = 3;
-  tarifaPorFila = 5.00;
+  cantidadCarros = signal<number>(1);
+  filasPorCarro = signal<number>(3);
+  tarifaPorFila = signal<number>(5.00);
   observaciones = '';
   seleccionadosIds = signal<string[]>([]);
 
   totalCalculado = computed(() => {
-    return Number((this.cantidadCarros * this.filasPorCarro * this.tarifaPorFila).toFixed(2));
+    return Number((this.cantidadCarros() * this.filasPorCarro() * this.tarifaPorFila()).toFixed(2));
   });
 
   montoPorPersonaCalculado = computed(() => {
@@ -204,8 +204,9 @@ export class DescargasComponent {
     this.modoEdicion.set(false);
     this.idEnEdicion.set(null);
     this.fecha = new Date().toISOString().split('T')[0];
-    this.cantidadCarros = 1;
-    this.filasPorCarro = 3;
+    this.cantidadCarros.set(1);
+    this.filasPorCarro.set(3);
+    this.tarifaPorFila.set(5.00);
     this.observaciones = '';
     this.seleccionarTrabajadorPorDefecto();
     this.mostrarFormulario.set(true);
@@ -221,9 +222,9 @@ export class DescargasComponent {
     this.modoEdicion.set(true);
     this.idEnEdicion.set(d.id);
     this.fecha = d.fecha;
-    this.cantidadCarros = d.cantidad_carros;
-    this.filasPorCarro = d.filas_por_carro;
-    this.tarifaPorFila = d.tarifa_por_fila;
+    this.cantidadCarros.set(d.cantidad_carros);
+    this.filasPorCarro.set(d.filas_por_carro);
+    this.tarifaPorFila.set(d.tarifa_por_fila);
     this.observaciones = d.observaciones || '';
     this.seleccionadosIds.set(d.trabajadores.map(t => t.trabajador_id));
     this.mostrarFormulario.set(true);
@@ -272,9 +273,9 @@ export class DescargasComponent {
       if (esEdicion) {
         await this.dataService.actualizarDescarga(this.idEnEdicion()!, {
           fecha: this.fecha,
-          cantidad_carros: Number(this.cantidadCarros),
-          filas_por_carro: Number(this.filasPorCarro),
-          tarifa_por_fila: Number(this.tarifaPorFila),
+          cantidad_carros: Number(this.cantidadCarros()),
+          filas_por_carro: Number(this.filasPorCarro()),
+          tarifa_por_fila: Number(this.tarifaPorFila()),
           trabajadores_ids: this.seleccionadosIds(),
           observaciones: this.observaciones
         });
@@ -283,9 +284,9 @@ export class DescargasComponent {
       } else {
         await this.dataService.registrarDescarga({
           fecha: this.fecha,
-          cantidad_carros: Number(this.cantidadCarros),
-          filas_por_carro: Number(this.filasPorCarro),
-          tarifa_por_fila: Number(this.tarifaPorFila),
+          cantidad_carros: Number(this.cantidadCarros()),
+          filas_por_carro: Number(this.filasPorCarro()),
+          tarifa_por_fila: Number(this.tarifaPorFila()),
           trabajadores_ids: this.seleccionadosIds(),
           observaciones: this.observaciones
         });

@@ -162,13 +162,13 @@
         <div>
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cantidad de Carros</label>
           <div class="flex items-center gap-2">
-            <button type="button" (click)="cantidadCarros = Math.max(1, cantidadCarros - 1)"
+            <button type="button" (click)="cantidadCarros.set(Math.max(1, cantidadCarros() - 1))"
               class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-lg font-bold text-slate-800 apple-btn-active cursor-pointer">
               −
             </button>
-            <input type="number" min="1" max="50" [(ngModel)]="cantidadCarros"
+            <input type="number" min="1" max="50" [ngModel]="cantidadCarros()" (ngModelChange)="cantidadCarros.set($event)"
               class="flex-1 text-center bg-slate-50 border border-slate-200/90 rounded-xl py-2 text-slate-900 text-base font-bold font-mono focus:bg-white focus:outline-none min-h-[42px]" />
-            <button type="button" (click)="cantidadCarros = cantidadCarros + 1"
+            <button type="button" (click)="cantidadCarros.set(cantidadCarros() + 1)"
               class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-lg font-bold text-slate-800 apple-btn-active cursor-pointer">
               +
             </button>
@@ -180,9 +180,9 @@
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Filas por Carro</label>
           <div class="grid grid-cols-4 gap-2">
             @for (f of [2, 3, 4, 5]; track f) {
-              <button type="button" (click)="filasPorCarro = f"
+              <button type="button" (click)="filasPorCarro.set(f)"
                 class="py-2 px-2 rounded-xl border text-xs font-semibold transition-all apple-btn-active min-h-[42px] flex flex-col items-center justify-center cursor-pointer"
-                [ngClass]="filasPorCarro === f ? 'bg-[#0f172a] border-[#0f172a] text-white shadow-xs' : 'bg-slate-50 border-slate-200/80 text-slate-700 hover:bg-slate-100'">
+                [ngClass]="filasPorCarro() === f ? 'bg-[#0f172a] border-[#0f172a] text-white shadow-xs' : 'bg-slate-50 border-slate-200/80 text-slate-700 hover:bg-slate-100'">
                 <span>{{ f }} Filas</span>
                 <span class="text-[10px] opacity-75 font-mono">${{ f * 5 }}</span>
               </button>
@@ -233,7 +233,7 @@
         <div>
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cálculo de Faena</span>
           <div class="text-sm sm:text-base text-slate-800 mt-0.5 font-medium">
-            {{ cantidadCarros }} carro(s) × {{ filasPorCarro }} filas = 
+            {{ cantidadCarros() }} carro(s) × {{ filasPorCarro() }} filas = 
             <strong class="text-slate-900 font-extrabold text-base sm:text-lg font-mono">${{ totalCalculado() | number:'1.2-2' }}</strong>
           </div>
           <span class="text-xs text-slate-500">

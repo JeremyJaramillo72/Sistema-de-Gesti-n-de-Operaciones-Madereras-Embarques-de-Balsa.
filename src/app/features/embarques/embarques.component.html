@@ -162,13 +162,13 @@
         <div>
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cantidad de Tráilers</label>
           <div class="flex items-center gap-2">
-            <button type="button" (click)="cantidadTrailers = Math.max(1, cantidadTrailers - 1)"
+            <button type="button" (click)="cantidadTrailers.set(Math.max(1, cantidadTrailers() - 1))"
               class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-lg font-bold text-slate-800 apple-btn-active cursor-pointer">
               −
             </button>
-            <input type="number" min="1" max="20" [(ngModel)]="cantidadTrailers"
+            <input type="number" min="1" max="20" [ngModel]="cantidadTrailers()" (ngModelChange)="cantidadTrailers.set($event)"
               class="flex-1 text-center bg-slate-50 border border-slate-200/90 rounded-xl py-2 text-slate-900 text-base font-bold font-mono focus:bg-white focus:outline-none min-h-[42px]" />
-            <button type="button" (click)="cantidadTrailers = cantidadTrailers + 1"
+            <button type="button" (click)="cantidadTrailers.set(cantidadTrailers() + 1)"
               class="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 flex items-center justify-center text-lg font-bold text-slate-800 apple-btn-active cursor-pointer">
               +
             </button>
@@ -180,7 +180,7 @@
           <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Tarifa / Persona ($)</label>
           <div class="relative">
             <span class="absolute left-3.5 top-2.5 text-slate-400 font-bold text-xs">$</span>
-            <input type="number" step="0.50" [(ngModel)]="tarifaPorPersona"
+            <input type="number" step="0.50" [ngModel]="tarifaPorPersona()" (ngModelChange)="tarifaPorPersona.set($event)"
               class="w-full bg-slate-50 border border-slate-200/90 rounded-xl pl-8 pr-3 py-2 text-slate-900 text-sm font-bold font-mono focus:bg-white focus:outline-none min-h-[42px]" />
           </div>
         </div>
@@ -228,7 +228,7 @@
         <div>
           <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cálculo de Embarque</span>
           <div class="text-sm sm:text-base text-slate-800 mt-0.5 font-medium">
-            {{ cantidadTrailers }} tráiler(s) × ${{ tarifaPorPersona | number:'1.2-2' }} =
+            {{ cantidadTrailers() }} tráiler(s) × ${{ tarifaPorPersona() | number:'1.2-2' }} =
             <strong class="text-slate-900 font-extrabold text-base sm:text-lg font-mono">${{ montoPorPersonaCalculado() | number:'1.2-2' }} c/u</strong>
           </div>
           <span class="text-xs text-slate-500">

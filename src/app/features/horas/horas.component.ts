@@ -42,8 +42,8 @@ export class HorasComponent {
 
   // CAMPOS DEL FORMULARIO
   fecha = new Date().toISOString().split('T')[0];
-  horas: number = 8;
-  tarifaPorHora: number = 2.50; // Tarifa por defecto solicitada: $2.50 / hora
+  horas = signal<number>(8);
+  tarifaPorHora = signal<number>(2.50); // Tarifa por defecto solicitada: $2.50 / hora
   actividad: string = 'Jornal General';
   observaciones: string = '';
   seleccionadosIds = signal<string[]>([]);
@@ -72,8 +72,8 @@ export class HorasComponent {
 
   // CÁLCULOS REACTIVOS DEL FORMULARIO
   montoPorPersonaCalculado = computed(() => {
-    const h = Number(this.horas) || 0;
-    const t = Number(this.tarifaPorHora) || 0;
+    const h = Number(this.horas()) || 0;
+    const t = Number(this.tarifaPorHora()) || 0;
     return Number((h * t).toFixed(2));
   });
 
@@ -147,7 +147,7 @@ export class HorasComponent {
   }
 
   establecerHoras(cantidad: number) {
-    this.horas = cantidad;
+    this.horas.set(cantidad);
   }
 
   establecerActividad(nombre: string) {
@@ -155,7 +155,7 @@ export class HorasComponent {
   }
 
   restablecerTarifa() {
-    this.tarifaPorHora = 2.50;
+    this.tarifaPorHora.set(2.50);
   }
 
   seleccionarTrabajadorPorDefecto() {
@@ -213,8 +213,8 @@ export class HorasComponent {
     this.modoEdicion.set(false);
     this.idEnEdicion.set(null);
     this.fecha = new Date().toISOString().split('T')[0];
-    this.horas = 8;
-    this.tarifaPorHora = 2.50;
+    this.horas.set(8);
+    this.tarifaPorHora.set(2.50);
     this.actividad = 'Jornal General';
     this.observaciones = '';
     this.seleccionarTrabajadorPorDefecto();
@@ -231,8 +231,8 @@ export class HorasComponent {
     this.modoEdicion.set(true);
     this.idEnEdicion.set(h.id);
     this.fecha = h.fecha;
-    this.horas = h.horas;
-    this.tarifaPorHora = h.tarifa_por_hora;
+    this.horas.set(h.horas);
+    this.tarifaPorHora.set(h.tarifa_por_hora);
     this.actividad = h.actividad || 'Jornal General';
     this.observaciones = h.observaciones || '';
     this.trabajadorIdEdicion = h.trabajador_id;
@@ -261,7 +261,7 @@ export class HorasComponent {
       return;
     }
 
-    const horasNum = Number(this.horas);
+    const horasNum = Number(this.horas());
     if (!horasNum || horasNum <= 0) {
       this.feedbackService.finalizarAdvertencia('La cantidad de horas debe ser mayor a 0');
       return;
@@ -279,7 +279,7 @@ export class HorasComponent {
           fecha: this.fecha,
           trabajador_id: this.trabajadorIdEdicion,
           horas: horasNum,
-          tarifa_por_hora: Number(this.tarifaPorHora) || 2.50,
+          tarifa_por_hora: Number(this.tarifaPorHora()) || 2.50,
           actividad: this.actividad,
           observaciones: this.observaciones
         });
@@ -290,7 +290,7 @@ export class HorasComponent {
           fecha: this.fecha,
           trabajadores_ids: this.seleccionadosIds(),
           horas: horasNum,
-          tarifa_por_hora: Number(this.tarifaPorHora) || 2.50,
+          tarifa_por_hora: Number(this.tarifaPorHora()) || 2.50,
           actividad: this.actividad,
           observaciones: this.observaciones
         });
